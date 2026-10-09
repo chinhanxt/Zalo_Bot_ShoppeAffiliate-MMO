@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+data/
+.vercel/
+.venv/
+node_modules/
+admin-mockup/
+*.log
+nohup.out

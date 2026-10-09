@@ -1,0 +1,964 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cashback Bot · Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap&subset=vietnamese" rel="stylesheet">
+<style>
+:root{
+  --bg:#F7F6F3;--surface:#FFF;--surface-c:#F1F0EC;--surface-ch:#E9E8E3;
+  --outline:#EAEAEA;--outline-v:#F0EFEC;
+  --on:#111;--on-v:#787774;--on-f:#A9A8A3;
+  --primary:#111;--on-primary:#FFF;
+  --income:#1F8A4C;--shopee:#EE4D2D;--shopee-c:#FEF0EC;--zalo:#0068FF;--zalo-c:#E8F1FF;
+  --danger:#B3261E;--danger-c:#FDEBEC;--success-c:#EDF3EC;
+  --font:"Be Vietnam Pro",system-ui,sans-serif;
+  --r-sm:12px;--r-md:14px;--r-lg:18px;--r-pill:999px;
+  --shadow:0 1px 2px rgba(17,17,17,.03),0 6px 20px rgba(17,17,17,.035);
+  --shadow-pop:0 1px 2px rgba(17,17,17,.04),0 12px 32px rgba(17,17,17,.08);
+  --sidebar-w:248px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--on);-webkit-font-smoothing:antialiased;min-height:100vh}
+.num{font-variant-numeric:tabular-nums}
+
+/* Sidebar */
+.side{display:flex;flex-direction:column;padding:28px 16px 20px;border-right:1px solid var(--outline);position:fixed;top:0;left:0;width:var(--sidebar-w);height:100vh;overflow-y:auto;background:var(--bg);z-index:10}
+.brand{display:flex;align-items:center;gap:12px;padding:0 8px 28px}
+.logo{width:36px;height:36px;border-radius:11px;background:var(--shopee);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px}
+.brand .n{font-size:16px;font-weight:700;letter-spacing:-0.01em}
+.brand .d{font-size:12px;color:var(--on-v)}
+.nav-label{font-size:12px;font-weight:500;color:var(--on-f);padding:0 12px;margin:4px 0 8px}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav a{height:42px;padding:0 12px;border-radius:var(--r-sm);display:flex;align-items:center;gap:12px;font-size:14.5px;font-weight:500;color:#55544F;text-decoration:none;border:1px solid transparent;cursor:pointer}
+.nav a svg{width:18px;height:18px;stroke-width:1.75;color:#8A8984;flex:none}
+.nav a.on{background:var(--surface);border-color:var(--outline);color:var(--on);font-weight:600;box-shadow:0 1px 3px rgba(17,17,17,.05)}
+.nav a.on svg{color:var(--on);stroke-width:2}
+.nav a .cnt{margin-left:auto;font-size:12px;color:var(--on-f);font-weight:500;font-variant-numeric:tabular-nums}
+.side-foot{margin-top:auto;display:flex;align-items:center;gap:10px;padding:12px 8px 0;border-top:1px solid var(--outline)}
+.side-foot .t1{font-size:13.5px;font-weight:600}
+.side-foot .t2{font-size:12px;color:var(--on-v);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Main */
+.main{margin-left:var(--sidebar-w);padding:36px 40px 32px;display:flex;flex-direction:column;gap:24px;min-width:0}
+.page-h{display:flex;justify-content:space-between;align-items:flex-end;gap:24px}
+.headline{font-size:30px;font-weight:700;letter-spacing:-0.025em}
+.sub{font-size:14px;color:var(--on-v);margin-top:4px}
+.page-h .acts{display:flex;gap:10px}
+
+/* Card */
+.card{background:var(--surface);border:1px solid var(--outline);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:24px;min-width:0}
+.card.flush{padding:0}
+.card-h{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.title-m{font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px}
+
+/* Grid */
+.grid{display:grid;gap:20px}
+.grid-4{grid-template-columns:repeat(4,1fr)}
+.grid-12{grid-template-columns:repeat(12,1fr)}
+
+/* KPI */
+.kpi .label-s{font-size:12.5px;font-weight:500;color:var(--on-v);display:flex;align-items:center;gap:8px}
+.kpi .label-s svg{width:16px;height:16px}
+.kpi .big{font-size:32px;font-weight:700;letter-spacing:-0.03em;margin-top:10px;font-variant-numeric:tabular-nums}
+.kpi .meta{display:flex;gap:20px;margin-top:18px;padding-top:16px;border-top:1px solid var(--outline-v)}
+.kpi .meta>div+div{border-left:1px solid var(--outline-v);padding-left:20px}
+.kpi .meta .v{font-size:16px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* Buttons */
+.btn{height:40px;padding:0 18px;border-radius:var(--r-pill);display:inline-flex;align-items:center;justify-content:center;gap:8px;font-size:14px;font-weight:600;border:0;font-family:inherit;white-space:nowrap;cursor:pointer}
+.btn svg{width:17px;height:17px}
+.btn-primary{background:var(--primary);color:var(--on-primary)}
+.btn-secondary{background:var(--surface);color:var(--on);border:1px solid var(--outline)}
+.btn-sm{height:34px;padding:0 14px;font-size:13.5px}
+
+/* Controls */
+.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:nowrap}
+.field{height:40px;border-radius:var(--r-sm);background:var(--surface);border:1px solid var(--outline);display:flex;align-items:center;gap:10px;padding:0 14px;font-size:14px;white-space:nowrap;min-width:0}
+.field input{border:0;outline:0;font:inherit;width:100%;background:none}
+.field svg{color:var(--on-v);width:17px;height:17px;flex:none}
+.field select{border:0;outline:0;font:inherit;background:none;font-weight:500;cursor:pointer}
+
+.chips{display:flex;gap:8px}
+.chip{height:34px;padding:0 14px;border-radius:var(--r-pill);background:var(--surface);border:1px solid var(--outline);display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:500;cursor:pointer;color:var(--on)}
+.chip.on{background:var(--primary);color:var(--on-primary);border-color:var(--primary)}
+.chip .c{font-variant-numeric:tabular-nums;opacity:.6}
+
+/* Badge */
+.badge{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 10px;border-radius:var(--r-pill);font-size:12px;font-weight:600;background:var(--surface-c);white-space:nowrap}
+.badge svg{width:13px;height:13px;stroke-width:2}
+.badge.ok{background:var(--success-c);color:var(--income)}
+.badge.shopee{background:var(--shopee-c);color:var(--shopee)}
+.badge.zalo{background:var(--zalo-c);color:var(--zalo)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--income);flex:none}
+
+/* Table */
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{text-align:left;font-size:12.5px;font-weight:500;color:var(--on-v);height:44px;padding:0 16px;border-bottom:1px solid var(--outline);white-space:nowrap}
+.tbl td{height:56px;padding:0 16px;border-bottom:1px solid var(--outline-v);font-size:14px;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tbl tr:last-child td{border-bottom:0}
+.tbl th:first-child,.tbl td:first-child{padding-left:24px}
+.tbl .r{text-align:right}
+.tbl tr:hover td{background:#FBFAF8}
+.tbl tr{cursor:pointer}
+.cell-user{display:flex;align-items:center;gap:12px;min-width:0}
+.cell-user .t1{font-weight:500;font-size:14.5px;overflow:hidden;text-overflow:ellipsis}
+.cell-user .t2{font-size:12.5px;color:var(--on-v);overflow:hidden;text-overflow:ellipsis}
+.cell-user>div{min-width:0}
+
+.bubble{width:40px;height:40px;border-radius:50%;background:var(--surface-c);display:inline-flex;align-items:center;justify-content:center;color:#3A3935;flex:none;font-size:13px;font-weight:600}
+.bubble.sm{width:32px;height:32px;font-size:12px}
+.bubble.lg{width:56px;height:56px;font-size:18px}
+.bubble.shopee{background:var(--shopee-c);color:var(--shopee)}
+.bubble.zalo{background:var(--zalo-c);color:var(--zalo)}
+.bubble svg{width:19px;height:19px}
+.bubble.sm svg{width:16px;height:16px}
+
+/* Pager */
+.pager{display:flex;align-items:center;justify-content:space-between;padding:10px 16px 10px 24px;border-top:1px solid var(--outline);font-size:13.5px;color:var(--on-v)}
+.pager .pages{display:flex;gap:4px}
+.pager .pg{min-width:34px;height:34px;border-radius:var(--r-pill);display:inline-flex;align-items:center;justify-content:center;font-weight:500;cursor:pointer;font-variant-numeric:tabular-nums;padding:0 6px}
+.pager .pg.on{background:var(--primary);color:#fff}
+.pager .pg.dis{color:var(--on-f);pointer-events:none}
+
+/* Crumb */
+.crumb{font-size:13.5px;font-weight:500;color:var(--on-v);cursor:pointer;margin-bottom:8px;display:inline-flex;align-items:center;gap:4px}
+.crumb:hover{color:var(--on)}
+.crumb svg{width:16px;height:16px}
+
+/* Chart */
+.chart{position:relative}
+.chart svg{display:block;overflow:visible}
+.chart text{font-family:var(--font);font-variant-numeric:tabular-nums}
+
+/* List row */
+.lrow{display:flex;align-items:center;gap:12px;min-height:52px;padding:0 24px}
+.lrow+.lrow{border-top:1px solid var(--outline-v)}
+.lrow .grow{flex:1;min-width:0}
+.lrow .t1{font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lrow .t2{font-size:12.5px;color:var(--on-v);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lrow .r{text-align:right;flex:none}
+
+/* Config rows */
+.scard{padding:0}
+.scard>.card-h{padding:18px 24px 14px}
+.srow{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:40px;padding:16px 24px;border-top:1px solid var(--outline-v);align-items:start}
+.srow .sl{font-size:14px;font-weight:600}
+.srow .sd{font-size:12.5px;color:var(--on-v);margin-top:3px}
+.srow .sc{min-width:0;display:flex;flex-direction:column;gap:6px}
+.srow .sc .help{font-size:12.5px;color:var(--on-f)}
+
+/* Toast */
+.toast-wrap{position:fixed;right:40px;bottom:32px;z-index:40;display:flex;flex-direction:column;gap:10px;width:420px}
+.toast{display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1px solid var(--outline);border-radius:16px;box-shadow:var(--shadow-pop);padding:14px 16px;animation:slideUp .3s ease-out}
+.toast .tt{font-size:14px;font-weight:600}
+.toast .td{font-size:13px;color:var(--on-v);margin-top:2px}
+@keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+
+/* Empty */
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;padding:56px 24px 64px;color:var(--on-v)}
+.empty .title-l{font-size:20px;font-weight:700;color:var(--on);margin-top:24px}
+
+.income{color:var(--income)} .muted{color:var(--on-v)} .faint{color:var(--on-f)}
+.fw6{font-weight:600} .mt-1{margin-top:4px} .mt-2{margin-top:8px} .mt-3{margin-top:12px}
+
+/* Loading */
+.sk{background:linear-gradient(90deg,#ECEBE7 0%,#F4F3F0 50%,#ECEBE7 100%);background-size:200% 100%;border-radius:8px;animation:sk 1.4s linear infinite}
+@keyframes sk{from{background-position:100% 0}to{background-position:-100% 0}}
+
+/* Hide */
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="side">
+  <div class="brand"><div class="logo">CB</div><div><div class="n">Cashback Bot</div><div class="d">Bảng quản trị</div></div></div>
+  <div class="nav-label">Quản lý</div>
+  <nav class="nav" id="nav"></nav>
+  <div class="side-foot"><div class="bubble sm">AD</div><div style="min-width:0;flex:1"><div class="t1">Admin</div><div class="t2">Bot Manager</div></div></div>
+</aside>
+
+<!-- Main content -->
+<div class="main" id="app"></div>
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+/* ═══════════════ Router ═══════════════ */
+const PAGES = {overview:'Tổng quan',users:'Người dùng',links:'Lịch sử link',withdrawals:'Rút tiền',messages:'Tin nhắn',notifications:'Thông báo',shopee:'Shopee Sync',config:'Cấu hình'};
+const ICONS = {overview:'layout-dashboard',users:'users',links:'link',withdrawals:'download',messages:'bot',notifications:'message-circle',shopee:'zap',config:'settings'};
+let currentPage = '', userCount = '…';
+
+function navigate(page, params) {
+  if (!PAGES[page]) page = 'overview';
+  currentPage = page;
+  location.hash = params ? `${page}/${params}` : page;
+  renderNav();
+  const app = $('app');
+  app.innerHTML = '<div style="padding:40px"><div class="sk" style="width:200px;height:24px"></div><div class="sk" style="width:400px;height:16px;margin-top:12px"></div></div>';
+  switch(page) {
+    case 'overview': renderOverview(); break;
+    case 'users': params ? renderUserDetail(params) : renderUsers(); break;
+    case 'links': renderLinks(); break;
+    case 'withdrawals': renderWithdrawals(); break;
+    case 'messages': renderMessages(); break;
+    case 'notifications': renderNotifications(); break;
+    case 'shopee': renderShopee(); break;
+    case 'config': renderConfig(); break;
+  }
+}
+
+function renderNav() {
+  $('nav').innerHTML = Object.entries(PAGES).map(([k,v]) =>
+    `<a class="${currentPage===k||(currentPage==='users'&&k==='users')?'on':''}" onclick="navigate('${k}')">
+      ${svg(ICONS[k])}<span>${v}</span>${k==='users'?`<span class="cnt">${userCount}</span>`:''}</a>`
+  ).join('');
+}
+
+/* ═══════════════ API helpers ═══════════════ */
+const api = (path) => fetch(path).then(r=>r.json());
+const $ = id => document.getElementById(id);
+const fmt = v => (v??0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+const esc = s => s ? String(s).replace(/</g,'&lt;') : '';
+const initials = n => { if (!n) return '??'; const p=n.split(' '); return ((p[p.length-2]||'')[0]||'?') + ((p[p.length-1]||'')[0]||''); };
+const shortId = id => id ? (id.length>16 ? id.slice(0,8)+'…'+id.slice(-4) : id) : '';
+const fmtDate = d => d ? d.replace('T',' ').slice(0,16) : '—';
+
+function svg(name){
+  const icons = {
+    'layout-dashboard':'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="4" rx="1"/><rect x="14" y="11" width="7" height="10" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',
+    'users':'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    'link':'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+    'settings':'<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+    'refresh-cw':'<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/>',
+    'search':'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+    'chevron-left':'<path d="m15 18-6-6 6-6"/>',
+    'chevron-right':'<path d="m9 18 6-6-6-6"/>',
+    'download':'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
+    'shopping-bag':'<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+    'message-circle':'<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+    'check':'<path d="M20 6 9 17l-5-5"/>',
+    'x':'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+    'mouse-pointer-click':'<path d="m9 9 5 12 1.8-5.2L21 14Z"/><path d="M7.2 2.2 8 5.1"/><path d="m5.1 8-2.9-.8"/><path d="M14 4.1 12 6"/><path d="m6 12-1.9 2"/>',
+    'bot':'<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>',
+    'server':'<rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/>',
+    'sparkles':'<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/>',
+    'zap':'<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+    'send':'<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>',
+    'log-in':'<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/>',
+    'loader':'<path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/>',
+  };
+  const d = icons[name] || '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+}
+
+function toast(title, desc) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.innerHTML = `<div class="bubble sm" style="background:var(--success-c);color:var(--income)">${svg('check')}</div><div style="flex:1"><div class="tt">${title}</div><div class="td">${desc}</div></div>`;
+  $('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+/* ═══════════════ OVERVIEW ═══════════════ */
+async function renderOverview() {
+  const [stats, daily, recent] = await Promise.all([
+    api('/api/admin/stats'),
+    api('/api/admin/daily-stats?days=7'),
+    api('/api/admin/recent?limit=5'),
+  ]);
+  userCount = fmt(stats.total_users);
+  renderNav();
+
+  $('app').innerHTML = `
+    <div class="page-h"><div><h1 class="headline">Tổng quan</h1><div class="sub">Hệ thống bot hoàn tiền Shopee qua Zalo</div></div>
+      <div class="acts"><button class="btn btn-secondary" onclick="navigate('overview')">${svg('refresh-cw')} Làm mới</button></div></div>
+    <div class="grid grid-4">
+      <div class="card kpi"><div class="label-s">${svg('users')} Người dùng Zalo</div><div class="big">${fmt(stats.total_users)}</div>
+        <div class="meta"><div><div class="label-s">Hoạt động 7 ngày</div><div class="v">${fmt(stats.users_active_7d)}</div></div><div><div class="label-s">Mới 7 ngày</div><div class="v income">+${fmt(stats.users_new_7d)}</div></div></div></div>
+      <div class="card kpi"><div class="label-s">${svg('link')} Link đã tạo</div><div class="big">${fmt(stats.total_links)}</div>
+        <div class="meta"><div><div class="label-s">Hôm nay</div><div class="v">${fmt(stats.links_today)}</div></div><div><div class="label-s">7 ngày</div><div class="v">${fmt(stats.links_7d)}</div></div></div></div>
+      <div class="card kpi"><div class="label-s">${svg('mouse-pointer-click')} Link hôm nay</div><div class="big">${fmt(stats.links_today)}</div>
+        <div class="meta"><div><div class="label-s">TB/ngày (7d)</div><div class="v">${fmt(Math.round(stats.links_7d/7))}</div></div></div></div>
+      <div class="card kpi"><div class="label-s"><span class="dot"></span> Affiliate ID</div><div class="big" style="font-size:20px;word-break:break-all">${stats.affiliate_id_set?'✓ Đã cấu hình':'✗ Chưa set'}</div>
+        <div class="meta"><div><div class="label-s">Server</div><div class="v">:${location.port||'8686'}</div></div></div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 380px;gap:20px;flex:1;min-height:0">
+      <div class="card" style="display:flex;flex-direction:column"><div class="card-h"><div class="title-m">Link tạo 7 ngày gần nhất</div></div>
+        <div class="chart" id="chart-7d" style="flex:1;min-height:220px;margin-top:16px"></div></div>
+      <div class="card flush" style="display:flex;flex-direction:column"><div class="card-h" style="padding:20px 24px 0"><div class="title-m">Hoạt động gần đây</div></div>
+        <div id="recent-list" style="margin-top:12px;flex:1"></div></div>
+    </div>`;
+
+  renderChart7d(daily);
+  $('recent-list').innerHTML = recent.length ? recent.map(r =>
+    `<div class="lrow"><div class="bubble sm">${initials(r.display_name)}</div><div class="grow"><div class="t1">${esc(r.display_name||shortId(r.zalo_id))}</div><div class="t2">${esc(r.original_url).slice(0,50)}</div></div><div class="r"><span class="muted" style="font-size:12.5px">${fmtDate(r.created_at).slice(5)}</span></div></div>`
+  ).join('') : '<div class="empty" style="padding:32px"><div class="title-l">Chưa có hoạt động</div></div>';
+}
+
+function renderChart7d(data) {
+  const el = $('chart-7d'); if (!el) return;
+  const W = el.clientWidth, H = el.clientHeight;
+  if (!W || !H) { setTimeout(()=>renderChart7d(data),100); return; }
+  const L=52,R=8,T=20,B=30;
+  const pw=W-L-R, ph=H-T-B;
+  const max = Math.max(10, ...data.map(d=>d.count)) * 1.15;
+  const y = v => T+ph - v/max*ph;
+  const slot = data.length ? pw/data.length : pw;
+  const bw = Math.min(40, slot*0.6);
+  let s = `<svg width="${W}" height="${H}">`;
+  // gridlines
+  const step = Math.ceil(max/4);
+  for (let t=0;t<=max;t+=step) {
+    s += `<line x1="${L}" x2="${W-R}" y1="${y(t)}" y2="${y(t)}" stroke="${t===0?'#E3E2DD':'#F0EFEC'}"/>`;
+    s += `<text x="${L-12}" y="${y(t)+4}" text-anchor="end" font-size="11.5" fill="#A9A8A3">${t}</text>`;
+  }
+  data.forEach((d,i) => {
+    const cx=L+slot*i+slot/2, x=cx-bw/2, v=d.count;
+    const h=Math.max(0,y(0)-y(v)), r=Math.min(4,h);
+    s += `<path d="M${x},${y(0)} V${y(v)+r} Q${x},${y(v)} ${x+r},${y(v)} H${x+bw-r} Q${x+bw},${y(v)} ${x+bw},${y(v)+r} V${y(0)} Z" fill="#EE4D2D" opacity="${i===data.length-1?1:0.7}"/>`;
+    s += `<text x="${cx}" y="${y(v)-8}" text-anchor="middle" font-size="12" fill="#111" font-weight="600">${v}</text>`;
+    s += `<text x="${cx}" y="${H-8}" text-anchor="middle" font-size="12" fill="${i===data.length-1?'#111':'#787774'}" font-weight="${i===data.length-1?600:400}">${d.day?.slice(5)||''}</text>`;
+  });
+  s += '</svg>';
+  el.innerHTML = s;
+}
+
+/* ═══════════════ USERS ═══════════════ */
+let usersPage=1, usersSearch='', usersSort='links_desc';
+
+async function renderUsers() {
+  const data = await api(`/api/admin/users?page=${usersPage}&per_page=15&search=${encodeURIComponent(usersSearch)}&sort=${usersSort}`);
+  userCount = fmt(data.total);
+  renderNav();
+
+  const rows = data.items.map(u => `<tr onclick="navigate('users','${u.zalo_id}')">
+    <td><div class="cell-user"><div class="bubble">${initials(u.display_name)}</div><div><div class="t1">${esc(u.display_name||'(chưa có tên)')}</div><div class="t2">${shortId(u.zalo_id)}</div></div></div></td>
+    <td class="r num">${u.total_clicks}</td>
+    <td class="r num fw6" style="color:var(--income)">${fmtVnd(u.balance||0)}</td>
+    <td class="muted num">${fmtDate(u.created_at)}</td>
+  </tr>`).join('');
+
+  $('app').innerHTML = `
+    <div class="page-h"><div><h1 class="headline">Người dùng</h1><div class="sub num">${fmt(data.total)} người dùng Zalo</div></div></div>
+    <div class="toolbar">
+      <div class="field" style="width:340px">${svg('search')}<input id="user-search" placeholder="Tìm theo tên hoặc Zalo ID" value="${esc(usersSearch)}" onkeydown="if(event.key==='Enter'){usersSearch=this.value;usersPage=1;renderUsers()}"></div>
+      <div class="field" style="width:200px"><select id="user-sort" onchange="usersSort=this.value;usersPage=1;renderUsers()">
+        <option value="links_desc" ${usersSort==='links_desc'?'selected':''}>Nhiều link nhất</option>
+        <option value="newest" ${usersSort==='newest'?'selected':''}>Mới nhất</option>
+        <option value="oldest" ${usersSort==='oldest'?'selected':''}>Cũ nhất</option>
+      </select></div>
+    </div>
+    <div class="card flush">
+      <table class="tbl"><colgroup><col><col style="width:100px"><col style="width:140px"><col style="width:160px"></colgroup>
+      <thead><tr><th>Người dùng</th><th class="r">Tổng link</th><th class="r">Số dư</th><th>Ngày tham gia</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="4"><div class="empty"><div class="title-l">Chưa có người dùng</div></div></td></tr>'}</tbody></table>
+      ${data.pages>1 ? renderPager(data.page, data.pages, p=>{usersPage=p;renderUsers()}) : ''}
+    </div>`;
+}
+
+async function renderUserDetail(zaloId) {
+  const u = await api(`/api/admin/users/${zaloId}`);
+  if (u.error) { navigate('users'); return; }
+
+  $('app').innerHTML = `
+    <div>
+      <div class="crumb" onclick="navigate('users')">${svg('chevron-left')} Người dùng</div>
+      <div style="display:flex;align-items:center;gap:16px">
+        <div class="bubble lg zalo">${svg('message-circle')}</div>
+        <div><div style="display:flex;align-items:center;gap:12px"><h1 class="headline">${esc(u.display_name||'(chưa có tên)')}</h1><span class="badge"><span class="dot"></span>Hoạt động</span></div>
+          <div class="sub mt-1">Zalo ID: ${shortId(u.zalo_id)} · Theo dõi từ ${fmtDate(u.created_at)}</div></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div class="card">
+          <div style="display:flex;gap:0;align-items:stretch">
+            <div style="flex:1"><div class="label-s">Tổng link tạo</div><div class="big" style="font-size:32px;margin-top:8px">${u.total_clicks}</div></div>
+            <div style="width:1px;background:var(--outline-v);margin:0 20px"></div>
+            <div style="flex:1"><div class="label-s">Lần dùng cuối</div><div class="title-m num mt-2">${u.links?.length ? fmtDate(u.links[0].created_at) : '—'}</div></div>
+          </div>
+        </div>
+        <div class="card flush">
+          <div class="card-h" style="padding:20px 24px 0"><div class="title-m">Link đã tạo</div><span style="font-size:13.5px;font-weight:600">${u.links?.length||0} link</span></div>
+          <div style="margin-top:12px">${(u.links||[]).map(l =>
+            `<div class="lrow"><div class="bubble sm shopee">${svg('shopping-bag')}</div><div class="grow"><div class="t1" style="font-size:13px">${esc(l.original_url).slice(0,60)}</div><div class="t2 income" style="font-size:12px">${esc(l.affiliate_url).slice(0,55)}</div></div><div class="r"><span class="muted" style="font-size:12px">${fmtDate(l.created_at).slice(5)}</span></div></div>`
+          ).join('')||'<div class="empty" style="padding:24px"><div class="title-l">Chưa có link</div></div>'}</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div class="card"><div class="title-m">Thông tin</div><div style="margin-top:12px">
+          ${[['Zalo ID',u.zalo_id],['Tên hiển thị',u.display_name||'—'],['Theo dõi từ',fmtDate(u.created_at)],['Tổng link',u.total_clicks]].map(p=>
+            `<div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--outline-v);font-size:13.5px"><span class="muted">${p[0]}</span><span class="fw6 num">${esc(String(p[1]))}</span></div>`
+          ).join('')}
+        </div></div>
+        <div class="card"><div class="title-m">💰 Ví tiền</div><div style="margin-top:12px">
+          ${[['Số dư',fmtVnd(u.balance||0)],['Tổng kiếm',fmtVnd(u.total_earned||0)],['Đã rút',fmtVnd(u.total_withdrawn||0)]].map(p=>
+            `<div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--outline-v);font-size:13.5px"><span class="muted">${p[0]}</span><span class="fw6 num">${esc(String(p[1]))}</span></div>`
+          ).join('')}
+        </div></div>
+        <div class="card"><div class="title-m">🏦 Ngân hàng</div><div style="margin-top:12px">
+          ${u.bank_name ? [['Ngân hàng',u.bank_name],['Số TK',u.bank_account],['Chủ TK',u.bank_holder]].map(p=>
+            `<div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--outline-v);font-size:13.5px"><span class="muted">${p[0]}</span><span class="fw6 num">${esc(String(p[1]))}</span></div>`
+          ).join('') : '<div style="padding:8px 0;font-size:13.5px;color:var(--on-f)">Chưa cài đặt</div>'}
+        </div></div>
+        <div class="card"><div class="title-m">Thống kê theo ngày</div><div style="margin-top:12px">
+          ${(u.daily||[]).slice(0,7).map(d =>
+            `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13.5px;font-variant-numeric:tabular-nums"><span class="fw6">${d.day}</span><span class="income">${d.count} link</span></div>`
+          ).join('')||'<span class="muted">Chưa có dữ liệu</span>'}
+        </div></div>
+      </div>
+    </div>`;
+}
+
+/* ═══════════════ LINKS ═══════════════ */
+let linksPage=1, linksSearch='', linksUser='';
+
+async function renderLinks() {
+  const data = await api(`/api/admin/links?page=${linksPage}&per_page=15&search=${encodeURIComponent(linksSearch)}&user=${encodeURIComponent(linksUser)}`);
+
+  const rows = data.items.map(l => {
+    const st = l.status || 'pending';
+    const stColor = st === 'confirmed' ? 'var(--income)' : 'var(--on-f)';
+    const stLabel = st === 'confirmed' ? 'Đã xác nhận' : 'Chờ xác nhận';
+    const comm = l.commission_user || 0;
+    return `<tr>
+    <td class="num muted">${fmtDate(l.created_at)}</td>
+    <td><div class="cell-user"><div class="bubble sm">${initials(l.display_name)}</div><div><div class="t1" style="font-size:13.5px">${esc(l.display_name||shortId(l.zalo_id))}</div></div></div></td>
+    <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis" title="${esc(l.original_url)}">${esc(l.original_url)}</td>
+    <td style="color:${stColor};font-size:13px"><span class="chip" style="font-size:12px">${stLabel}</span></td>
+    <td style="font-weight:600;color:var(--income)">${comm > 0 ? fmtVnd(comm) : '—'}</td>
+    <td>${st === 'pending' ? `<button class="btn btn-sm btn-primary" onclick="setCommission(${l.id},'${esc(l.display_name||shortId(l.zalo_id))}')" style="font-size:12px;padding:4px 8px">${svg('check')} HH</button>` : ''}</td>
+  </tr>`;
+  }).join('');
+
+  $('app').innerHTML = `
+    <div class="page-h"><div><h1 class="headline">Lịch sử link</h1><div class="sub num">${fmt(data.total)} link đã tạo</div></div>
+      <div class="acts"><button class="btn btn-secondary" onclick="exportCSV()">${svg('download')} Xuất CSV</button></div></div>
+    <div class="toolbar">
+      <div class="field" style="width:280px">${svg('search')}<input id="link-search" placeholder="Tìm theo URL gốc" value="${esc(linksSearch)}" onkeydown="if(event.key==='Enter'){linksSearch=this.value;linksPage=1;renderLinks()}"></div>
+      <div class="field" style="width:200px"><input id="link-user" placeholder="Lọc Zalo ID" value="${esc(linksUser)}" onkeydown="if(event.key==='Enter'){linksUser=this.value;linksPage=1;renderLinks()}"></div>
+      ${linksSearch||linksUser?`<button class="btn btn-sm btn-secondary" onclick="linksSearch='';linksUser='';linksPage=1;renderLinks()">Xóa bộ lọc</button>`:''}
+    </div>
+    <div class="card flush">
+      <table class="tbl"><colgroup><col style="width:140px"><col style="width:180px"><col><col style="width:110px"><col style="width:90px"><col style="width:70px"></colgroup>
+      <thead><tr><th>Thời gian</th><th>Người dùng</th><th>URL gốc</th><th>Trạng thái</th><th>Hoa hồng</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="6"><div class="empty"><div class="title-l">Không có link nào</div></div></td></tr>'}</tbody></table>
+      ${data.pages>1 ? renderPager(data.page, data.pages, p=>{linksPage=p;renderLinks()}) : ''}
+    </div>`;
+}
+
+async function setCommission(linkId, userName) {
+  const input = prompt(`Nhập hoa hồng user (30% tổng HH) cho "${userName}".\nVí dụ: Shopee trả 10.000đ HH → user nhận 3.000đ.\n\nSố tiền (VNĐ):`);
+  if (!input) return;
+  const amount = parseFloat(input.replace(/[,.đ]/g, ''));
+  if (isNaN(amount) || amount <= 0) { toast('Lỗi', 'Số tiền không hợp lệ'); return; }
+  try {
+    const res = await fetch(`/api/admin/links/${linkId}/commission`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({commission_user: amount}),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      toast('Thành công', `Đã cộng ${fmtVnd(amount)} vào ví ${userName}`);
+      renderLinks();
+    } else {
+      toast('Lỗi', data.error);
+    }
+  } catch(e) { toast('Lỗi', 'Không thể kết nối'); }
+}
+
+function exportCSV() {
+  window.open(`/api/admin/links?per_page=10000&search=${encodeURIComponent(linksSearch)}&user=${encodeURIComponent(linksUser)}`);
+  toast('Xuất dữ liệu','Dữ liệu JSON đã mở trong tab mới.');
+}
+
+/* ═══════════════ WITHDRAWALS ═══════════════ */
+
+async function renderWithdrawals() {
+  const data = await api('/api/admin/withdrawals');
+
+  const statusBadge = s => {
+    if (s==='approved') return '<span class="badge ok">Đã duyệt</span>';
+    if (s==='rejected') return '<span class="badge" style="background:var(--danger-c);color:var(--danger)">Từ chối</span>';
+    return '<span class="badge" style="background:var(--zalo-c);color:var(--zalo)">Chờ duyệt</span>';
+  };
+
+  const pending = data.filter(w => w.status==='pending');
+
+  const rows = data.map(w => `<tr>
+    <td class="num fw6">#${w.id}</td>
+    <td><div class="cell-user"><div class="bubble sm">${initials(w.display_name)}</div><div><div class="t1" style="font-size:13.5px">${esc(w.display_name||shortId(w.zalo_id))}</div></div></div></td>
+    <td class="num fw6" style="color:var(--shopee)">${fmtVnd(w.amount)}</td>
+    <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis" title="${esc(w.bank_info)}">${esc(w.bank_info)}</td>
+    <td>${statusBadge(w.status)}</td>
+    <td class="muted num">${fmtDate(w.created_at)}</td>
+    <td>${w.status==='pending'?`<button class="btn btn-sm btn-primary" onclick="processWithdraw(${w.id},'approve')">Duyệt</button> <button class="btn btn-sm btn-secondary" onclick="processWithdraw(${w.id},'reject')">Từ chối</button>`:''}</td>
+  </tr>`).join('');
+
+  $('app').innerHTML = `
+    <div class="page-h"><div><h1 class="headline">Rút tiền</h1><div class="sub">${pending.length} yêu cầu chờ duyệt</div></div></div>
+    <div class="card flush">
+      <table class="tbl">
+      <thead><tr><th style="width:60px">#</th><th>Người dùng</th><th>Số tiền</th><th>Ngân hàng</th><th>Trạng thái</th><th>Ngày</th><th style="width:200px">Thao tác</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="7"><div class="empty" style="padding:40px"><div class="title-l">Chưa có yêu cầu rút tiền nào</div></div></td></tr>'}</tbody></table>
+    </div>`;
+}
+
+async function processWithdraw(id, action) {
+  const note = action==='reject' ? (prompt('Lý do từ chối:')||'') : '';
+  const res = await fetch(`/api/admin/withdrawals/${id}/process`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({action, note}),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    toast(action==='approve'?'Đã duyệt':'Đã từ chối', `Yêu cầu #${id} đã được xử lý`);
+    renderWithdrawals();
+  } else {
+    toast('Lỗi', data.error||'Không thể xử lý');
+  }
+}
+
+function fmtVnd(v) { return (v||0).toLocaleString('vi-VN') + 'đ'; }
+
+/* ═══════════════ MESSAGES (Tin nhắn — gửi + lịch) ═══════════════ */
+
+async function renderMessages() {
+  const scheduled = await api('/api/admin/scheduled');
+
+  const schRows = scheduled.map(s => `<tr>
+    <td class="num fw6">#${s.id}</td>
+    <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis" title="${esc(s.message)}">${esc(s.message).slice(0,60)}</td>
+    <td class="num">${s.interval_hours}h</td>
+    <td class="muted num">${s.last_sent_at ? fmtDate(s.last_sent_at) : 'Chưa gửi'}</td>
+    <td>${s.is_active ? '<span class="badge ok">Đang chạy</span>' : '<span class="badge">Tạm dừng</span>'}</td>
+    <td>
+      <button class="btn btn-sm btn-secondary" onclick="toggleScheduled(${s.id},${s.is_active?0:1})">${s.is_active?'Dừng':'Bật'}</button>
+      <button class="btn btn-sm btn-secondary" style="color:var(--danger)" onclick="deleteScheduled(${s.id})">Xoá</button>
+    </td>
+  </tr>`).join('');
+
+  $('app').innerHTML = `
+    <div class="page-h"><div><h1 class="headline">Tin nhắn</h1><div class="sub">Gửi tin nhắn & lên lịch nhắc nhở mua sắm</div></div></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div class="card">
+        <div class="title-m">${svg('message-circle')} Gửi tin nhắn</div>
+        <div style="margin-top:12px">
+          <textarea id="notif-msg" rows="3" placeholder="Nhập tin nhắn gửi cho user..." style="width:100%;border:1px solid var(--outline);border-radius:var(--r-sm);padding:10px;font:14px var(--font);resize:vertical"></textarea>
+          <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+            <input id="notif-zalo" placeholder="Zalo ID (để trống = gửi tất cả)" style="flex:1;height:40px;border:1px solid var(--outline);border-radius:var(--r-sm);padding:0 12px;font:14px var(--font)">
+            <button class="btn btn-primary" onclick="sendNotification()">Gửi</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="title-m">${svg('refresh-cw')} Lên lịch nhắc nhở</div>
+        <div style="margin-top:12px">
+          <textarea id="sch-msg" rows="3" placeholder="Tin nhắn nhắc nhở mua sắm..." style="width:100%;border:1px solid var(--outline);border-radius:var(--r-sm);padding:10px;font:14px var(--font);resize:vertical"></textarea>
+          <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+            <div class="field" style="width:180px"><select id="sch-interval" style="border:0;outline:0;font:inherit;background:none;cursor:pointer;width:100%">
+              <option value="6">Mỗi 6 giờ</option>
+              <option value="12">Mỗi 12 giờ</option>
+              <option value="24" selected>Mỗi ngày</option>
+              <option value="48">Mỗi 2 ngày</option>
+              <option value="72">Mỗi 3 ngày</option>
+              <option value="168">Mỗi tuần</option>
+            </select></div>
+            <button class="btn btn-primary" onclick="createScheduled()">Tạo lịch</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card flush">
+      <div class="card-h" style="padding:20px 24px 12px"><div class="title-m">Lịch nhắc nhở</div><span style="font-size:13.5px;color:var(--on-v)">${scheduled.length} lịch</span></div>
+      <table class="tbl">
+      <thead><tr><th style="width:50px">#</th><th>Nội dung</th><th style="width:80px">Chu kỳ</th><th style="width:140px">Gửi lần cuối</th><th style="width:100px">Trạng thái</th><th style="width:160px">Thao tác</th></tr></thead>
+      <tbody>${schRows||'<tr><td colspan="6"><div class="empty" style="padding:24px"><div class="title-l">Chưa có lịch nhắc nhở</div></div></td></tr>'}</tbody></table>
+    </div>`;
+}
+
+async function sendNotification() {
+  const msg = document.getElementById('notif-msg').value.trim();
+  const zaloId = document.getElementById('notif-zalo').value.trim();
+  if (!msg) { toast('Lỗi','Nhập nội dung tin nhắn'); return; }
+  const res = await fetch('/api/admin/notifications/send', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({message: msg, zalo_id: zaloId}),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    toast('Đã gửi', `Gửi thành công tới ${data.sent} người`);
+    document.getElementById('notif-msg').value = '';
+    document.getElementById('notif-zalo').value = '';
+    renderMessages();
+  } else {
+    toast('Lỗi', data.error||'Không thể gửi');
+  }
+}
+
+async function createScheduled() {
+  const msg = document.getElementById('sch-msg').value.trim();
+  const interval = document.getElementById('sch-interval').value;
+  if (!msg) { toast('Lỗi','Nhập nội dung tin nhắn'); return; }
+  const res = await fetch('/api/admin/scheduled', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({message: msg, interval_hours: parseInt(interval)}),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    toast('Đã tạo', `Lịch nhắc nhở #${data.id} đã được tạo`);
+    document.getElementById('sch-msg').value = '';
+    renderMessages();
+  } else {
+    toast('Lỗi', data.error||'Không thể tạo');
+  }
+}
+
+async function toggleScheduled(id, active) {
+  await fetch(`/api/admin/scheduled/${id}/toggle`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({is_active: active}),
+  });
+  toast(active?'Đã bật':'Đã dừng', `Lịch #${id}`);
+  renderMessages();
+}
+
+async function deleteScheduled(id) {
+  await fetch(`/api/admin/scheduled/${id}`, {method:'DELETE'});
+  toast('Đã xoá', `Lịch #${id} đã bị xoá`);
+  renderMessages();
+}
+
+/* ═══════════════ NOTIFICATIONS (Thông báo — lịch sử) ═══════════════ */
+
+function _typeBadge(t) {
+  if (t==='withdrawal') return '<span class="badge ok">Rút tiền</span>';
+  if (t==='broadcast') return '<span class="badge zalo">Gửi tất cả</span>';
+  if (t==='scheduled') return '<span class="badge shopee">Tự động</span>';
+  return '<span class="badge">Tuỳ chỉnh</span>';
+}
+
+async function renderNotifications() {
+  const notifs = await api('/api/admin/notifications');
+
+  const notifRows = notifs.map(n => `<tr>
+    <td class="muted num">${fmtDate(n.created_at)}</td>
+    <td>${_typeBadge(n.type)}</td>
+    <td>${n.zalo_id ? `<div class="cell-user"><div class="bubble sm">${initials(n.display_name)}</div><div><div class="t1" style="font-size:13px">${esc(n.display_name||shortId(n.zalo_id))}</div></div></div>` : '<span class="muted">Tất cả</span>'}</td>
+    <td style="max-width:400px;overflow:hidden;text-overflow:ellipsis" title="${esc(n.message)}">${esc(n.message).slice(0,100)}</td>
+    <td class="num">${n.sent_count}</td>
+  </tr>`).join('');
+
+  $('app').innerHTML = `
+    <div class="page-h"><div><h1 class="headline">Thông báo</h1><div class="sub">Lịch sử thông báo đã gửi cho user</div></div>
+      <div class="acts"><button class="btn btn-secondary" onclick="renderNotifications()">${svg('refresh-cw')} Làm mới</button></div></div>
+    <div class="card flush">
+      <table class="tbl">
+      <thead><tr><th style="width:150px">Thời gian</th><th style="width:100px">Loại</th><th style="width:180px">Người nhận</th><th>Nội dung</th><th style="width:60px" class="r">Gửi</th></tr></thead>
+      <tbody>${notifRows||'<tr><td colspan="5"><div class="empty" style="padding:40px"><div class="title-l">Chưa có thông báo nào</div><div class="sub mt-2">Thông báo sẽ xuất hiện khi admin duyệt/từ chối rút tiền hoặc gửi tin nhắn</div></div></td></tr>'}</tbody></table>
+    </div>`;
+}
+
+/* ═══════════════ CONFIG ═══════════════ */
+let _cfgDirty = false;
+
+function cfgInput(id, value, opts={}) {
+  const type = opts.type || 'text';
+  const ro = opts.readonly ? 'readonly' : '';
+  const mono = opts.mono ? 'font-family:monospace;font-size:13px;' : 'font-variant-numeric:tabular-nums;';
+  const bg = opts.readonly ? 'background:var(--bg);color:var(--on-f);' : '';
+  return `<div class="field" style="${mono}${bg}"><input id="${id}" type="${type}" value="${esc(value)}" ${ro} style="font:inherit;${mono}" oninput="_cfgDirty=true;cfgToggleSave()"></div>`;
+}
+
+function cfgToggleSave() {
+  const btn = document.getElementById('cfg-save');
+  if (btn) btn.disabled = !_cfgDirty;
+}
+
+async function saveConfig() {
+  const btn = document.getElementById('cfg-save');
+  btn.disabled = true;
+  btn.innerHTML = 'Đang lưu…';
+  const body = {
+    AFFILIATE_ID: document.getElementById('cfg-aff-id').value.trim(),
+    ZALO_BOT_TOKEN: document.getElementById('cfg-zalo-token').value.trim(),
+    ZALO_WEBHOOK_SECRET: document.getElementById('cfg-zalo-secret').value.trim(),
+    GEMINI_API_KEY: document.getElementById('cfg-gemini-key').value.trim(),
+  };
+  try {
+    const res = await fetch('/api/admin/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      _cfgDirty = false;
+      toast('Đã lưu cấu hình', `Cập nhật ${data.updated.length} mục: ${data.updated.join(', ')}`);
+      renderConfig();
+    }
+  } catch(e) {
+    toast('Lỗi', 'Không thể lưu cấu hình.');
+    btn.disabled = false;
+    btn.innerHTML = svg('check') + ' Lưu thay đổi';
+  }
+}
+
+/* ═══════════════ Shopee Sync ═══════════════ */
+async function renderShopee() {
+  const st = await api('/api/admin/shopee/status');
+  const statusColor = st.has_cookies ? 'var(--income)' : 'var(--danger)';
+  const statusText = st.has_cookies ? 'Đã kết nối' : 'Chưa có cookie';
+  $('app').innerHTML = `
+    <div class="hdr"><div><div class="title-l">${svg('zap')} Shopee Affiliate Sync</div>
+    <div class="sub">Tự động đồng bộ hoa hồng từ Shopee Affiliate dashboard</div></div></div>
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header">Trạng thái kết nối</div>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:10px;height:10px;border-radius:50%;background:${statusColor}"></div>
+          <span style="font-weight:600;color:${statusColor}">${statusText}</span>
+          ${st.cookie_user ? `<span style="color:var(--on-f)">— ${esc(st.cookie_user)}</span>` : ''}
+        </div>
+        ${st.last_sync ? `<div style="font-size:13px;color:var(--on-f)">Lần sync cuối: ${esc(st.last_sync)} · ${st.last_sync_count} conversion · Tổng: ${st.total_synced}</div>` : ''}
+        <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+          <span style="font-size:13px;color:var(--on-f)">Auto check mỗi:</span>
+          <select id="sync-interval" onchange="shopeeSetInterval(this.value)" style="padding:4px 8px;border:1px solid var(--outline);border-radius:var(--r-sm);font-size:13px">
+            ${[1,2,3,6,12,24,48].map(h => `<option value="${h}" ${st.sync_interval_hours===h?'selected':''}>${h} giờ</option>`).join('')}
+          </select>
+          <span style="font-size:12px;color:var(--on-f)">(Bot tự lên Shopee check đơn hàng + hoa hồng)</span>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header">Upload Cookies</div>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:13px;color:var(--on-f)">Cách lấy cookies: Cài extension <b>EditThisCookie</b> hoặc <b>Cookie-Editor</b> → vào <b>affiliate.shopee.vn</b> → Export cookies (JSON) → paste vào đây</div>
+        <textarea id="shopee-cookie-input" rows="5" style="width:100%;font-family:monospace;font-size:12px;padding:8px;border:1px solid var(--outline);border-radius:var(--r-sm);resize:vertical" placeholder='Paste JSON cookies hoặc cookie string từ DevTools...'></textarea>
+        <input type="file" id="shopee-cookie-file" accept=".json" style="display:none" onchange="shopeeLoadFile(this)">
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" onclick="shopeeSaveCookies()">${svg('check')} Lưu Cookies</button>
+          <button class="btn btn-secondary" onclick="document.getElementById('shopee-cookie-file').click()">${svg('download')} Chọn file JSON</button>
+          ${st.has_cookies ? `<button class="btn btn-secondary" onclick="shopeeVerify(this)">${svg('zap')} Kiểm tra</button>` : ''}
+          ${st.has_cookies ? `<button class="btn btn-secondary" onclick="shopeeSync(this)">${svg('refresh-cw')} Sync ngay</button>` : ''}
+        </div>
+        <div id="shopee-cookie-status"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header">Cách hoạt động</div>
+      <div style="padding:16px;font-size:14px;line-height:1.8;color:var(--on-f)">
+        <div>1️⃣ <b>Upload cookies</b> — Export cookies từ browser (affiliate.shopee.vn) → paste/upload</div>
+        <div>2️⃣ <b>Auto Sync</b> — Mỗi 6 giờ, bot tự vào dashboard scrape báo cáo chuyển đổi</div>
+        <div>3️⃣ <b>Match sub_id</b> — Mỗi link affiliate có sub_id = Zalo ID → biết user nào mua</div>
+        <div>4️⃣ <b>Cập nhật ví</b> — Đơn hoàn tất → tính 30% hoa hồng → cộng ví user → thông báo Zalo</div>
+      </div>
+    </div>
+    <div id="shopee-result"></div>`;
+}
+
+function shopeeLoadFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => { document.getElementById('shopee-cookie-input').value = e.target.result; };
+  reader.readAsText(file);
+}
+
+async function shopeeSaveCookies() {
+  const raw = document.getElementById('shopee-cookie-input').value.trim();
+  const el = document.getElementById('shopee-cookie-status');
+  if (!raw) { el.innerHTML = '<span style="color:var(--danger)">Chưa nhập cookies</span>'; return; }
+  el.innerHTML = '<span style="color:var(--on-f)">Đang lưu...</span>';
+  try {
+    let body;
+    try { body = JSON.parse(raw); } catch { body = { cookie_string: raw }; }
+    const res = await fetch('/api/admin/shopee/cookies', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      toast('Thành công', data.message);
+      renderShopee();
+    } else {
+      el.innerHTML = `<span style="color:var(--danger)">${esc(data.error)}</span>`;
+    }
+  } catch(e) {
+    el.innerHTML = '<span style="color:var(--danger)">Lỗi kết nối</span>';
+  }
+}
+
+async function shopeeSetInterval(hours) {
+  try {
+    const res = await fetch('/api/admin/shopee/interval', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({hours: parseInt(hours)}),
+    });
+    const data = await res.json();
+    if (data.ok) toast('Đã lưu', `Auto-sync mỗi ${data.interval_hours} giờ`);
+  } catch(e) { toast('Lỗi', 'Không thể lưu'); }
+}
+
+async function shopeeVerify(btn) {
+  btn.disabled = true;
+  btn.innerHTML = svg('loader') + ' Đang kiểm tra...';
+  try {
+    const res = await fetch('/api/admin/shopee/verify', {method:'POST'});
+    const data = await res.json();
+    if (data.ok) {
+      toast('Cookie OK', `User: ${data.user} · Affiliate ID: ${data.affiliate_id}`);
+    } else {
+      toast('Lỗi', data.error);
+    }
+    renderShopee();
+  } catch(e) {
+    toast('Lỗi', 'Không thể kết nối');
+    btn.disabled = false;
+    btn.innerHTML = svg('zap') + ' Kiểm tra';
+  }
+}
+
+async function shopeeSync(btn) {
+  btn.disabled = true;
+  btn.innerHTML = svg('loader') + ' Đang sync...';
+  const el = document.getElementById('shopee-result');
+  el.innerHTML = '<div style="padding:20px;color:var(--on-f)">Đang scrape Shopee Affiliate dashboard... (có thể mất 30-60 giây)</div>';
+  try {
+    const res = await fetch('/api/admin/shopee/sync', {method:'POST'});
+    const data = await res.json();
+    if (data.ok) {
+      let html = `<div class="card"><div class="card-header">Kết quả Sync</div><div style="padding:16px">`;
+      html += `<div style="margin-bottom:8px">Nguồn: <b>${esc(data.source)}</b> · Tìm thấy: <b>${data.count}</b> conversion</div>`;
+      if (data.wallet_sync) {
+        html += `<div style="color:var(--income);font-weight:600">Cập nhật ví: ${data.wallet_sync.updated} · Thông báo: ${data.wallet_sync.notified} user</div>`;
+      }
+      if (data.conversions && data.conversions.length > 0) {
+        html += `<table class="tbl" style="margin-top:12px"><thead><tr><th>Order</th><th>Sub ID</th><th>Status</th><th>Hoa hồng</th><th>Thời gian</th></tr></thead><tbody>`;
+        data.conversions.forEach(c => {
+          html += `<tr><td>${esc(c.order_id||'—')}</td><td>${esc(c.sub_id||'—')}</td><td><span class="chip">${esc(c.status||'—')}</span></td><td style="color:var(--income);font-weight:600">${fmtVnd(c.commission||0)}</td><td>${esc(c.purchase_time||'—')}</td></tr>`;
+        });
+        html += `</tbody></table>`;
+      }
+      html += `</div></div>`;
+      el.innerHTML = html;
+      toast('Sync xong', `${data.count} conversion, ${data.wallet_sync?.updated||0} ví cập nhật`);
+    } else {
+      el.innerHTML = `<div class="card" style="border-color:var(--danger)"><div style="padding:16px;color:var(--danger)">Lỗi: ${esc(data.error)}</div></div>`;
+      toast('Lỗi', data.error);
+    }
+  } catch(e) {
+    el.innerHTML = '';
+    toast('Lỗi', 'Không thể kết nối server');
+  }
+  btn.disabled = false;
+  btn.innerHTML = svg('refresh-cw') + ' Sync ngay';
+}
+
+async function renderConfig() {
+  const cfg = await api('/api/admin/config');
+  _cfgDirty = false;
+
+  $('app').innerHTML = `
+    <div class="page-h"><div><h1 class="headline">Cấu hình</h1><div class="sub">Thiết lập bot hoàn tiền và kết nối Zalo Bot</div></div>
+      <div class="acts"><button id="cfg-save" class="btn btn-primary" disabled onclick="saveConfig()">${svg('check')} Lưu thay đổi</button></div></div>
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <div class="card scard">
+        <div class="card-h"><div class="title-m">${svg('shopping-bag')} Shopee Affiliate</div>${cfg.affiliate_id_set?'<span class="badge ok">'+svg('check')+' Đã cấu hình</span>':'<span class="badge" style="background:var(--shopee-c);color:var(--shopee)">Chưa set</span>'}</div>
+        <div class="srow"><div><div class="sl">Affiliate ID</div><div class="sd">ID tài khoản affiliate Shopee.</div></div>
+          <div class="sc">${cfgInput('cfg-aff-id', cfg.affiliate_id||'')}<div class="help">Lấy từ Shopee Affiliate Dashboard → Thông tin tài khoản</div></div></div>
+      </div>
+      <div class="card scard">
+        <div class="card-h"><div class="title-m">${svg('bot')} Zalo Bot</div>${cfg.zalo_bot_token_set?'<span class="badge zalo">'+svg('check')+' Đã kết nối</span>':'<span class="badge" style="background:var(--shopee-c);color:var(--shopee)">Chưa set</span>'}</div>
+        <div class="srow"><div><div class="sl">Bot Token</div><div class="sd">Token HTTP API từ Zalo Bot Creator.</div></div>
+          <div class="sc">${cfgInput('cfg-zalo-token', cfg.zalo_bot_token||'')}<div class="help">Lấy từ zalo.me/s/botcreator → Quản lý Bot → Token</div></div></div>
+        <div class="srow"><div><div class="sl">Webhook Secret</div><div class="sd">Secret token xác thực webhook từ Zalo.</div></div>
+          <div class="sc">${cfgInput('cfg-zalo-secret', cfg.zalo_webhook_secret||'')}<div class="help">Tự đặt khi gọi setWebhook API</div></div></div>
+        <div class="srow"><div><div class="sl">Webhook URL</div><div class="sd">URL nhận event từ Zalo Bot. Cần HTTPS public.</div></div>
+          <div class="sc">${cfgInput('cfg-webhook', location.origin+'/webhook', {readonly:true, mono:true})}<div class="help">Dùng ngrok/cloudflared tunnel để expose ra HTTPS</div></div></div>
+      </div>
+      <div class="card scard">
+        <div class="card-h"><div class="title-m">${svg('sparkles')} AI Chatbot (Gemini)</div>${cfg.gemini_api_key_set?'<span class="badge ok">'+svg('check')+' Đã cấu hình</span>':'<span class="badge">Chưa set</span>'}</div>
+        <div class="srow"><div><div class="sl">API Key</div><div class="sd">Google Gemini Flash — AI trả lời thông minh khi user chat tự do.</div></div>
+          <div class="sc">
+            ${cfgInput('cfg-gemini-key', cfg.gemini_api_key||'')}
+            <div style="display:flex;gap:8px;align-items:center">
+              <button class="btn btn-sm btn-secondary" onclick="testGemini()">${svg('zap')} Test kết nối</button>
+              <span id="gemini-status" style="font-size:13px"></span>
+            </div>
+            <div class="help">Lấy từ aistudio.google.com → API keys. Free 15 req/phút</div>
+          </div></div>
+      </div>
+      <div class="card scard">
+        <div class="card-h"><div class="title-m">${svg('server')} Hệ thống</div></div>
+        <div class="srow"><div><div class="sl">Server</div><div class="sd">Host và port lắng nghe.</div></div>
+          <div class="sc">${cfgInput('cfg-server', cfg.host+':'+cfg.port, {readonly:true, mono:true})}</div></div>
+        <div class="srow"><div><div class="sl">Database</div><div class="sd">SQLite file lưu users + links.</div></div>
+          <div class="sc">${cfgInput('cfg-db', 'data/bot.db', {readonly:true, mono:true})}</div></div>
+      </div>
+    </div>
+    <p class="muted" style="font-size:13px">Thay đổi sẽ cập nhật runtime ngay lập tức và ghi vào file .env.</p>`;
+}
+
+async function testGemini() {
+  const el = document.getElementById('gemini-status');
+  const key = document.getElementById('cfg-gemini-key').value.trim();
+  if (!key) { el.innerHTML = '<span style="color:var(--danger)">✗ Nhập API key trước</span>'; return; }
+  el.innerHTML = '<span style="color:var(--on-v)">Đang lưu & test...</span>';
+  try {
+    await fetch('/api/admin/config', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({GEMINI_API_KEY: key}),
+    });
+    const res = await fetch('/api/admin/test-gemini', {method:'POST'});
+    const data = await res.json();
+    if (data.ok) {
+      el.innerHTML = '<span style="color:var(--income)">✓ ' + esc(data.message) + '</span>';
+      _cfgDirty = false; cfgToggleSave();
+    } else {
+      el.innerHTML = '<span style="color:var(--danger)">✗ ' + esc(data.error) + '</span>';
+    }
+  } catch(e) {
+    el.innerHTML = '<span style="color:var(--danger)">✗ Lỗi kết nối</span>';
+  }
+}
+
+/* ═══════════════ Pager ═══════════════ */
+let _pagerCallbacks = {};
+function renderPager(page, pages, callback) {
+  const id = 'pager-' + Math.random().toString(36).slice(2);
+  _pagerCallbacks[id] = callback;
+  let btns = '';
+  if (page > 1) btns += `<span class="pg" onclick="_pagerCallbacks['${id}'](${page-1})">${svg('chevron-left')}</span>`;
+  else btns += `<span class="pg dis">${svg('chevron-left')}</span>`;
+  const show = [1];
+  if (page > 3) show.push(-1);
+  for (let i = Math.max(2, page-1); i <= Math.min(pages-1, page+1); i++) show.push(i);
+  if (page < pages-2) show.push(-1);
+  if (pages > 1) show.push(pages);
+  show.forEach(p => {
+    if (p === -1) btns += `<span class="pg dis">…</span>`;
+    else btns += `<span class="pg ${p===page?'on':''}" onclick="_pagerCallbacks['${id}'](${p})">${p}</span>`;
+  });
+  if (page < pages) btns += `<span class="pg" onclick="_pagerCallbacks['${id}'](${page+1})">${svg('chevron-right')}</span>`;
+  else btns += `<span class="pg dis">${svg('chevron-right')}</span>`;
+  return `<div class="pager"><span class="num">Trang ${page}/${pages}</span><div class="pages">${btns}</div></div>`;
+}
+
+/* ═══════════════ Init ═══════════════ */
+function init() {
+  const hash = location.hash.slice(1);
+  const [page, ...rest] = hash.split('/');
+  navigate(page || 'overview', rest.join('/'));
+}
+window.addEventListener('hashchange', init);
+init();
+</script>
+</body>
+</html>
