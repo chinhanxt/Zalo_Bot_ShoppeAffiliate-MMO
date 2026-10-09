@@ -123,9 +123,9 @@ input:focus{border-color:#111}
 .err{color:#B3261E;font-size:13px;margin-top:12px;min-height:18px}
 </style></head><body>
 <div class="box">
-<div class="logo">CB</div>
-<h1>Cashback Bot Admin</h1>
-<p class="sub">Đăng nhập để quản lý bot</p>
+<svg viewBox="0 0 64 64" width="64" height="64" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:16px"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FF6B35"/><stop offset="100%" stop-color="#EE4D2D"/></linearGradient></defs><rect width="64" height="64" rx="18" fill="url(#lg)"/><text x="32" y="43" text-anchor="middle" font-family="'Be Vietnam Pro',system-ui,sans-serif" font-size="32" font-weight="800" fill="#fff" letter-spacing="-1">xT</text></svg>
+<h1>Zalo-Bot Shopee</h1>
+<p class="sub">Đăng nhập Affiliate Dashboard</p>
 <form onsubmit="return doLogin(event)">
 <input type="password" id="pw" placeholder="Mật khẩu" autofocus>
 <button class="btn" type="submit">Đăng nhập</button>

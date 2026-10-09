@@ -28,7 +28,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--on);-webkit-font-s
 /* Sidebar */
 .side{display:flex;flex-direction:column;padding:28px 16px 20px;border-right:1px solid var(--outline);position:fixed;top:0;left:0;width:var(--sidebar-w);height:100vh;overflow-y:auto;background:var(--bg);z-index:10}
 .brand{display:flex;align-items:center;gap:12px;padding:0 8px 28px}
-.logo{width:36px;height:36px;border-radius:11px;background:var(--shopee);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px}
+.logo{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:none}
 .brand .n{font-size:16px;font-weight:700;letter-spacing:-0.01em}
 .brand .d{font-size:12px;color:var(--on-v)}
 .nav-label{font-size:12px;font-weight:500;color:var(--on-f);padding:0 12px;margin:4px 0 8px}
@@ -177,7 +177,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--on);-webkit-font-s
 
 <!-- Sidebar -->
 <aside class="side">
-  <div class="brand"><div class="logo">CB</div><div><div class="n">Cashback Bot</div><div class="d">Bảng quản trị</div></div></div>
+  <div class="brand"><div class="logo"><svg viewBox="0 0 36 36" width="36" height="36" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FF6B35"/><stop offset="100%" stop-color="#EE4D2D"/></linearGradient></defs><rect width="36" height="36" rx="11" fill="url(#lg)"/><text x="18" y="24.5" text-anchor="middle" font-family="'Be Vietnam Pro',system-ui,sans-serif" font-size="18" font-weight="800" fill="#fff" letter-spacing="-0.5">xT</text></svg></div><div><div class="n">Zalo-Bot Shopee</div><div class="d">Affiliate Dashboard</div></div></div>
   <div class="nav-label">Quản lý</div>
   <nav class="nav" id="nav"></nav>
   <div class="side-foot"><div class="bubble sm">AD</div><div style="min-width:0;flex:1"><div class="t1">Admin</div><div class="t2">Bot Manager</div></div><a onclick="doLogout()" style="cursor:pointer;font-size:12px;color:var(--on-v);text-decoration:underline" title="Đăng xuất">Logout</a></div>
