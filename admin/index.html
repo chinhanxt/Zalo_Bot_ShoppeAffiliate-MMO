@@ -267,20 +267,23 @@ function toast(title, desc) {
 
 /* ═══════════════ OVERVIEW ═══════════════ */
 async function renderOverview() {
-  const [stats, daily, recent, shopSt] = await Promise.all([
+  const [stats, daily, recent, shopSt, cfg] = await Promise.all([
     api('/api/admin/stats'),
     api('/api/admin/daily-stats?days=7'),
     api('/api/admin/recent?limit=5'),
     api('/api/admin/shopee/status'),
+    api('/api/admin/config'),
   ]);
   userCount = fmt(stats.total_users);
   renderNav();
-  const cookieWarn = shopSt.status === 'cookie_expired' ? `<div style="background:var(--danger-c);border:1px solid var(--danger);border-radius:var(--r-sm);padding:12px 20px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="navigate('shopee')"><span style="font-size:18px">⚠️</span><span style="font-weight:600;color:var(--danger);font-size:14px">Cookie Shopee hết hạn — bấm để upload cookies mới</span></div>` : '';
+  let warnings = '';
+  if (shopSt.status === 'cookie_expired') warnings += `<div style="background:var(--danger-c);border:1px solid var(--danger);border-radius:var(--r-sm);padding:12px 20px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="navigate('shopee')"><span style="font-size:18px">⚠️</span><span style="font-weight:600;color:var(--danger);font-size:14px">Cookie Shopee hết hạn — bấm để upload cookies mới</span></div>`;
+  if (!cfg.gemini_api_key_set) warnings += `<div style="background:#FFF8E1;border:1px solid #F9A825;border-radius:var(--r-sm);padding:12px 20px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="navigate('config')"><span style="font-size:18px">💡</span><span style="font-weight:600;color:#E65100;font-size:14px">Gemini API Key chưa cấu hình — AI chatbot sẽ không hoạt động</span></div>`;
 
   $('app').innerHTML = `
     <div class="page-h"><div><h1 class="headline">Tổng quan</h1><div class="sub">Hệ thống bot hoàn tiền Shopee qua Zalo</div></div>
       <div class="acts"><button class="btn btn-secondary" onclick="navigate('overview')">${svg('refresh-cw')} Làm mới</button></div></div>
-    ${cookieWarn}
+    ${warnings}
     <div class="grid grid-4">
       <div class="card kpi"><div class="label-s">${svg('users')} Người dùng Zalo</div><div class="big">${fmt(stats.total_users)}</div>
         <div class="meta"><div><div class="label-s">Hoạt động 7 ngày</div><div class="v">${fmt(stats.users_active_7d)}</div></div><div><div class="label-s">Mới 7 ngày</div><div class="v income">+${fmt(stats.users_new_7d)}</div></div></div></div>

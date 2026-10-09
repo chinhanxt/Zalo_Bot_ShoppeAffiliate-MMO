@@ -149,6 +149,11 @@ async function doLogin(e){
 LOGIN_HTML = LOGIN_HTML.replace("='/admin'", f"='{_ADM}'")
 
 
+@app.get("/")
+async def root_redirect():
+    return RedirectResponse("/login")
+
+
 @app.get("/login")
 async def login_page():
     return HTMLResponse(LOGIN_HTML)
