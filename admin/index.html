@@ -195,20 +195,23 @@ let currentPage = '', userCount = '…';
 
 function navigate(page, params) {
   if (!PAGES[page]) page = 'overview';
+  if (_navCtrl) _navCtrl.abort();
+  _navCtrl = new AbortController();
   currentPage = page;
   location.hash = params ? `${page}/${params}` : page;
   renderNav();
   const app = $('app');
   app.innerHTML = '<div style="padding:40px"><div class="sk" style="width:200px;height:24px"></div><div class="sk" style="width:400px;height:16px;margin-top:12px"></div></div>';
+  const run = fn => fn().catch(e => { if (e.name !== 'AbortError') console.error(e); });
   switch(page) {
-    case 'overview': renderOverview(); break;
-    case 'users': params ? renderUserDetail(params) : renderUsers(); break;
-    case 'links': renderLinks(); break;
-    case 'withdrawals': renderWithdrawals(); break;
-    case 'messages': renderMessages(); break;
-    case 'notifications': renderNotifications(); break;
-    case 'shopee': renderShopee(); break;
-    case 'config': renderConfig(); break;
+    case 'overview': run(renderOverview); break;
+    case 'users': params ? run(() => renderUserDetail(params)) : run(renderUsers); break;
+    case 'links': run(renderLinks); break;
+    case 'withdrawals': run(renderWithdrawals); break;
+    case 'messages': run(renderMessages); break;
+    case 'notifications': run(renderNotifications); break;
+    case 'shopee': run(renderShopee); break;
+    case 'config': run(renderConfig); break;
   }
 }
 
@@ -221,7 +224,9 @@ function renderNav() {
 
 /* ═══════════════ API helpers ═══════════════ */
 async function doLogout(){if(confirm('Đăng xuất?')){await fetch('/api/auth/logout',{method:'POST'});window.location='/login';}}
-const api = (path) => fetch(path).then(r=>{if(r.status===401){window.location='/login';return{}}return r.json()});
+const _cache={};let _navCtrl=null;
+const api=(path)=>{const c=_cache[path];if(c&&Date.now()-c.t<30000)return Promise.resolve(c.d);return fetch(path,{signal:_navCtrl?.signal}).then(r=>{if(r.status===401){window.location='/login';return{}}return r.json()}).then(d=>{_cache[path]={d,t:Date.now()};return d})};
+function _clearCache(){for(const k in _cache)delete _cache[k]}
 const $ = id => document.getElementById(id);
 const fmt = v => (v??0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 const esc = s => s ? String(s).replace(/</g,'&lt;') : '';
@@ -258,6 +263,7 @@ function svg(name){
 }
 
 function toast(title, desc) {
+  _clearCache();
   const el = document.createElement('div');
   el.className = 'toast';
   el.innerHTML = `<div class="bubble sm" style="background:var(--success-c);color:var(--income)">${svg('check')}</div><div style="flex:1"><div class="tt">${title}</div><div class="td">${desc}</div></div>`;
@@ -277,7 +283,7 @@ async function renderOverview() {
 
   $('app').innerHTML = `
     <div class="page-h"><div><h1 class="headline">Tổng quan</h1><div class="sub">Hệ thống bot hoàn tiền Shopee qua Zalo</div></div>
-      <div class="acts"><button class="btn btn-secondary" onclick="navigate('overview')">${svg('refresh-cw')} Làm mới</button></div></div>
+      <div class="acts"><button class="btn btn-secondary" onclick="_clearCache();navigate('overview')">${svg('refresh-cw')} Làm mới</button></div></div>
     ${warnings}
     <div class="grid grid-4">
       <div class="card kpi"><div class="label-s">${svg('users')} Người dùng Zalo</div><div class="big">${fmt(stats.total_users)}</div>
@@ -660,7 +666,7 @@ async function renderNotifications() {
 
   $('app').innerHTML = `
     <div class="page-h"><div><h1 class="headline">Thông báo</h1><div class="sub">Lịch sử thông báo đã gửi cho user</div></div>
-      <div class="acts"><button class="btn btn-secondary" onclick="renderNotifications()">${svg('refresh-cw')} Làm mới</button></div></div>
+      <div class="acts"><button class="btn btn-secondary" onclick="_clearCache();navigate('notifications')">${svg('refresh-cw')} Làm mới</button></div></div>
     <div class="card flush">
       <table class="tbl">
       <thead><tr><th style="width:150px">Thời gian</th><th style="width:100px">Loại</th><th style="width:180px">Người nhận</th><th>Nội dung</th><th style="width:60px" class="r">Gửi</th></tr></thead>
