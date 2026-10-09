@@ -169,6 +169,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--on);-webkit-font-s
 .sk{background:linear-gradient(90deg,#ECEBE7 0%,#F4F3F0 50%,#ECEBE7 100%);background-size:200% 100%;border-radius:8px;animation:sk 1.4s linear infinite}
 @keyframes sk{from{background-position:100% 0}to{background-position:-100% 0}}
 
+/* Modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:50;display:flex;align-items:center;justify-content:center;animation:fadeIn .15s ease-out}
+.modal{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--shadow-pop);width:420px;max-width:90vw;animation:scaleIn .2s ease-out}
+.modal-head{padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between}
+.modal-head .title-m{font-size:17px}
+.modal-body{padding:16px 24px 20px}
+.modal-foot{padding:0 24px 20px;display:flex;justify-content:flex-end;gap:10px}
+.modal .inp{width:100%;height:48px;border:1.5px solid var(--outline);border-radius:var(--r-sm);padding:0 14px;font:16px var(--font);font-variant-numeric:tabular-nums;outline:none;transition:border-color .15s}
+.modal .inp:focus{border-color:var(--primary)}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes scaleIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:none}}
+
 /* Hide */
 [hidden]{display:none!important}
 </style>
@@ -460,24 +472,61 @@ async function renderLinks() {
     </div>`;
 }
 
-async function setCommission(linkId, userName) {
-  const input = prompt(`Nhập hoa hồng user (30% tổng HH) cho "${userName}".\nVí dụ: Shopee trả 10.000đ HH → user nhận 3.000đ.\n\nSố tiền (VNĐ):`);
-  if (!input) return;
-  const amount = parseFloat(input.replace(/[,.đ]/g, ''));
-  if (isNaN(amount) || amount <= 0) { toast('Lỗi', 'Số tiền không hợp lệ'); return; }
+function setCommission(linkId, userName) {
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.onclick = e => { if (e.target === bg) bg.remove(); };
+  bg.innerHTML = `
+    <div class="modal">
+      <div class="modal-head"><div class="title-m">💰 Cộng hoa hồng</div>
+        <span style="cursor:pointer;padding:4px;color:var(--on-f)" onclick="this.closest('.modal-bg').remove()">${svg('x')}</span></div>
+      <div class="modal-body">
+        <div style="font-size:14px;color:var(--on-v);margin-bottom:16px">
+          <div style="font-weight:600;color:var(--on);margin-bottom:4px">${esc(userName)}</div>
+          Nhập số tiền user nhận (30% tổng HH Shopee)
+          <div style="margin-top:6px;padding:8px 12px;background:var(--surface-c);border-radius:8px;font-size:13px">
+            📋 VD: Shopee trả 10.000đ → user nhận <b>3.000đ</b>
+          </div>
+        </div>
+        <div style="font-size:13px;font-weight:600;color:var(--on-v);margin-bottom:6px">Số tiền (VNĐ)</div>
+        <input id="modal-commission" class="inp" type="text" inputmode="numeric" placeholder="VD: 3000" autofocus
+          onkeydown="if(event.key==='Enter')document.getElementById('modal-confirm').click()">
+        <div id="modal-err" style="font-size:13px;color:var(--danger);margin-top:6px;min-height:18px"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary" onclick="this.closest('.modal-bg').remove()">Huỷ</button>
+        <button id="modal-confirm" class="btn btn-primary" onclick="_confirmCommission(${linkId},'${esc(userName)}')">${svg('check')} Xác nhận</button>
+      </div>
+    </div>`;
+  document.body.appendChild(bg);
+  setTimeout(() => bg.querySelector('#modal-commission').focus(), 50);
+}
+
+async function _confirmCommission(linkId, userName) {
+  const inp = document.getElementById('modal-commission');
+  const err = document.getElementById('modal-err');
+  const raw = inp.value.trim();
+  const amount = parseFloat(raw.replace(/[,.đ\s]/g, ''));
+  if (!raw || isNaN(amount) || amount <= 0) { err.textContent = 'Nhập số tiền hợp lệ'; inp.focus(); return; }
+  const btn = document.getElementById('modal-confirm');
+  btn.disabled = true; btn.innerHTML = 'Đang xử lý…';
   try {
     const res = await fetch(`/api/admin/links/${linkId}/commission`, {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({commission_user: amount}),
     });
     const data = await res.json();
+    document.querySelector('.modal-bg')?.remove();
     if (data.ok) {
       toast('Thành công', `Đã cộng ${fmtVnd(amount)} vào ví ${userName}`);
       renderLinks();
     } else {
       toast('Lỗi', data.error);
     }
-  } catch(e) { toast('Lỗi', 'Không thể kết nối'); }
+  } catch(e) {
+    err.textContent = 'Không thể kết nối server';
+    btn.disabled = false; btn.innerHTML = svg('check') + ' Xác nhận';
+  }
 }
 
 function exportCSV() {
