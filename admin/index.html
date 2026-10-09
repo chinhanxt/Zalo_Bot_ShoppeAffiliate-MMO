@@ -267,17 +267,20 @@ function toast(title, desc) {
 
 /* ═══════════════ OVERVIEW ═══════════════ */
 async function renderOverview() {
-  const [stats, daily, recent] = await Promise.all([
+  const [stats, daily, recent, shopSt] = await Promise.all([
     api('/api/admin/stats'),
     api('/api/admin/daily-stats?days=7'),
     api('/api/admin/recent?limit=5'),
+    api('/api/admin/shopee/status'),
   ]);
   userCount = fmt(stats.total_users);
   renderNav();
+  const cookieWarn = shopSt.status === 'cookie_expired' ? `<div style="background:var(--danger-c);border:1px solid var(--danger);border-radius:var(--r-sm);padding:12px 20px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="navigate('shopee')"><span style="font-size:18px">⚠️</span><span style="font-weight:600;color:var(--danger);font-size:14px">Cookie Shopee hết hạn — bấm để upload cookies mới</span></div>` : '';
 
   $('app').innerHTML = `
     <div class="page-h"><div><h1 class="headline">Tổng quan</h1><div class="sub">Hệ thống bot hoàn tiền Shopee qua Zalo</div></div>
       <div class="acts"><button class="btn btn-secondary" onclick="navigate('overview')">${svg('refresh-cw')} Làm mới</button></div></div>
+    ${cookieWarn}
     <div class="grid grid-4">
       <div class="card kpi"><div class="label-s">${svg('users')} Người dùng Zalo</div><div class="big">${fmt(stats.total_users)}</div>
         <div class="meta"><div><div class="label-s">Hoạt động 7 ngày</div><div class="v">${fmt(stats.users_active_7d)}</div></div><div><div class="label-s">Mới 7 ngày</div><div class="v income">+${fmt(stats.users_new_7d)}</div></div></div></div>
@@ -715,11 +718,17 @@ async function saveConfig() {
 /* ═══════════════ Shopee Sync ═══════════════ */
 async function renderShopee() {
   const st = await api('/api/admin/shopee/status');
-  const statusColor = st.has_cookies ? 'var(--income)' : 'var(--danger)';
-  const statusText = st.has_cookies ? 'Đã kết nối' : 'Chưa có cookie';
+  const isExpired = st.status === 'cookie_expired';
+  const statusColor = isExpired ? 'var(--danger)' : st.has_cookies ? 'var(--income)' : 'var(--danger)';
+  const statusText = isExpired ? 'Cookie hết hạn!' : st.has_cookies ? 'Đã kết nối' : 'Chưa có cookie';
+  const alertBanner = isExpired ? `<div style="background:var(--danger-c);border:1px solid var(--danger);border-radius:var(--r-sm);padding:14px 20px;margin-bottom:20px;display:flex;align-items:center;gap:12px">
+    <span style="font-size:22px">⚠️</span>
+    <div><div style="font-weight:700;color:var(--danger)">Cookie Shopee đã hết hạn!</div>
+    <div style="font-size:13px;color:var(--danger);margin-top:2px">Auto-sync đã dừng. Upload cookies mới bên dưới để tiếp tục đồng bộ hoa hồng.${st.last_error ? ' — Lỗi: '+esc(st.last_error) : ''}</div></div></div>` : '';
   $('app').innerHTML = `
     <div class="hdr"><div><div class="title-l">${svg('zap')} Shopee Affiliate Sync</div>
     <div class="sub">Tự động đồng bộ hoa hồng từ Shopee Affiliate dashboard</div></div></div>
+    ${alertBanner}
     <div class="card" style="margin-bottom:20px">
       <div class="card-header">Trạng thái kết nối</div>
       <div style="padding:16px;display:flex;flex-direction:column;gap:12px">

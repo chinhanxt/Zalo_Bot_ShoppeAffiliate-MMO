@@ -824,6 +824,17 @@ async def cron_shopee_sync(request: Request):
         return {"ok": False, "reason": "no_cookies"}
     result = await scrape_conversions(days=7)
     if not result.get("ok"):
+        if "hết hạn" in result.get("error", ""):
+            try:
+                admin_ids = await all_user_chat_ids()
+                if admin_ids:
+                    await send_text(
+                        config.ZALO_BOT_TOKEN, admin_ids[0],
+                        "⚠️ [Admin] Cookie Shopee đã hết hạn!\n"
+                        "Vào Admin → Shopee Sync → Upload cookies mới để tiếp tục đồng bộ hoa hồng.",
+                    )
+            except Exception:
+                pass
         return result
     if result.get("conversions"):
         sync = await sync_commissions_to_wallets(result["conversions"])

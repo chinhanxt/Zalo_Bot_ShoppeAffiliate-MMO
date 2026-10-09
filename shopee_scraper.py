@@ -61,6 +61,13 @@ async def get_scraper_status() -> dict:
     cookies = await _load_cookies()
     has_cookies = len(cookies) > 0
     state = await _load_state()
+    last_error = state.get("last_error", "")
+    if has_cookies and last_error:
+        status = "cookie_expired"
+    elif has_cookies:
+        status = "ready"
+    else:
+        status = "need_cookie"
     return {
         "has_cookies": has_cookies,
         "last_sync": state.get("last_sync"),
@@ -68,7 +75,8 @@ async def get_scraper_status() -> dict:
         "total_synced": state.get("total_synced", 0),
         "cookie_user": state.get("cookie_user", ""),
         "sync_interval_hours": state.get("sync_interval_hours", 6),
-        "status": "ready" if has_cookies else "need_cookie",
+        "status": status,
+        "last_error": last_error,
     }
 
 
@@ -101,7 +109,7 @@ async def save_cookies_from_json(cookies_data: list) -> dict:
         return {"ok": False, "error": "Cookies thiếu session (SPC_F/SPC_SI). Export lại từ affiliate.shopee.vn"}
 
     await _save_cookies(pw_cookies)
-    await _save_state({"cookie_user": "", "login_at": datetime.now().isoformat()})
+    await _save_state({"cookie_user": "", "login_at": datetime.now().isoformat(), "last_error": ""})
     return {"ok": True, "message": f"Đã lưu {len(pw_cookies)} cookies!", "cookie_count": len(pw_cookies)}
 
 
@@ -172,6 +180,7 @@ async def scrape_conversions(days: int = 30) -> dict:
                 return {"ok": False, "error": "Không thể kết nối Shopee API"}
             check_data = check.json()
             if check_data.get("code") != 0:
+                await _save_state({"last_error": "Cookie hết hạn", "last_error_at": datetime.now().isoformat()})
                 return {"ok": False, "error": "Cookie hết hạn. Upload cookies mới."}
 
             while True:
@@ -207,6 +216,7 @@ async def scrape_conversions(days: int = 30) -> dict:
             "last_sync": datetime.now().isoformat(),
             "last_sync_count": len(conversions),
             "total_synced": state.get("total_synced", 0) + len(conversions),
+            "last_error": "",
         })
 
         return {
