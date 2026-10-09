@@ -457,8 +457,8 @@ async def handle_user_message(result: dict):
             if ai_count >= ai_limit:
                 await send_text(
                     config.ZALO_BOT_TOKEN, chat_id,
-                    f"🤖 Bạn đã dùng hết {ai_limit} lượt chat AI hôm nay.\n"
-                    f"Quay lại mai nhé! Gửi link Shopee vẫn hoạt động bình thường 🛒",
+                    "Mình chưa hiểu ý bạn lắm 😅\n"
+                    "Bạn gửi link Shopee để mình tạo link hoàn tiền nhé! 🛒",
                 )
                 return
             ai_reply = await ask_gemini(config.GEMINI_API_KEY, text, display_name)
