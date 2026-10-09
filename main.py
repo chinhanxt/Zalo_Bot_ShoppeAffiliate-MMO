@@ -494,7 +494,8 @@ async def handle_user_message(result: dict):
         reply = (
             f"🎉 Link hoàn tiền của bạn:\n\n"
             f"🔗 {results[0]}\n\n"
-            f"💰 Hoàn ~1.5% giá trị đơn\n"
+            f"💲 Hoàn ~1.5% giá trị đơn\n"
+            f"📋 VD: đơn 200.000đ → hoàn ~3.000đ\n"
             f"📌 Mua qua link → đơn thành công → tiền tự vào ví!"
         )
     else:
