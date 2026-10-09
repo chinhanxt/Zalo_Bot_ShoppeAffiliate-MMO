@@ -693,6 +693,7 @@ async function saveConfig() {
     ZALO_BOT_TOKEN: document.getElementById('cfg-zalo-token').value.trim(),
     ZALO_WEBHOOK_SECRET: document.getElementById('cfg-zalo-secret').value.trim(),
     GEMINI_API_KEY: document.getElementById('cfg-gemini-key').value.trim(),
+    AI_USER_LIMIT: parseInt(document.getElementById('cfg-ai-limit').value) || 10,
   };
   try {
     const res = await fetch('/api/admin/config', {
@@ -902,6 +903,8 @@ async function renderConfig() {
             </div>
             <div class="help">Lấy từ aistudio.google.com → API keys. Free 15 req/phút</div>
           </div></div>
+        <div class="srow"><div><div class="sl">Giới hạn AI / user / ngày</div><div class="sd">Số lượt chat AI tối đa mỗi user mỗi ngày. Chống spam đốt token.</div></div>
+          <div class="sc">${cfgInput('cfg-ai-limit', cfg.ai_user_limit||10, {type:'number'})}<div class="help">Mặc định 10 lượt/ngày. Set 0 = tắt AI hoàn toàn</div></div></div>
       </div>
       <div class="card scard">
         <div class="card-h"><div class="title-m">${svg('server')} Hệ thống</div></div>

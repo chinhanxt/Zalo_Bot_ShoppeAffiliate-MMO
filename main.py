@@ -449,7 +449,21 @@ async def handle_user_message(result: dict):
     if not urls:
         ai_reply = None
         if config.GEMINI_API_KEY:
+            from datetime import date
+            ai_limit = int(await kv_get("config_AI_USER_LIMIT") or "10")
+            usage_key = f"ai_{date.today().isoformat()}_{tracking_id}"
+            usage_raw = await kv_get(usage_key)
+            ai_count = int(usage_raw) if usage_raw else 0
+            if ai_count >= ai_limit:
+                await send_text(
+                    config.ZALO_BOT_TOKEN, chat_id,
+                    f"🤖 Bạn đã dùng hết {ai_limit} lượt chat AI hôm nay.\n"
+                    f"Quay lại mai nhé! Gửi link Shopee vẫn hoạt động bình thường 🛒",
+                )
+                return
             ai_reply = await ask_gemini(config.GEMINI_API_KEY, text, display_name)
+            if ai_reply:
+                await kv_set(usage_key, str(ai_count + 1))
         if ai_reply:
             await send_text(config.ZALO_BOT_TOKEN, chat_id, ai_reply)
         else:
@@ -613,6 +627,7 @@ async def api_admin_config():
         "zalo_webhook_secret_set": bool(secret),
         "gemini_api_key": gemini,
         "gemini_api_key_set": bool(gemini),
+        "ai_user_limit": int(await kv_get("config_AI_USER_LIMIT") or "10"),
         "host": config.HOST,
         "port": config.PORT,
     }
@@ -631,6 +646,10 @@ async def api_admin_config_update(request: Request):
             setattr(config, key, val)
             await kv_set(f"config_{key}", val)
             updated.append(key)
+    if "AI_USER_LIMIT" in body:
+        val = str(int(body["AI_USER_LIMIT"]))
+        await kv_set("config_AI_USER_LIMIT", val)
+        updated.append("AI_USER_LIMIT")
     return {"ok": True, "updated": updated}
 
 
