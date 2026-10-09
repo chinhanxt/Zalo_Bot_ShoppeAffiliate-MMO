@@ -133,6 +133,34 @@ async def admin_daily_stats(days: int = 7) -> list[dict]:
     return r["rows"]
 
 
+async def admin_overview_batch() -> dict:
+    results = await turso.execute_batch([
+        ("SELECT COUNT(*) c FROM users", None),
+        ("SELECT COUNT(*) c FROM links", None),
+        ("SELECT COUNT(*) c FROM links WHERE date(created_at)=date('now')", None),
+        ("SELECT COUNT(*) c FROM links WHERE created_at >= datetime('now','-7 days')", None),
+        ("SELECT COUNT(*) c FROM users WHERE created_at >= datetime('now','-7 days')", None),
+        ("SELECT COUNT(DISTINCT zalo_id) c FROM links WHERE created_at >= datetime('now','-7 days')", None),
+        ("SELECT date(created_at) as day, COUNT(*) as count FROM links "
+         "WHERE created_at >= datetime('now','-7 days') GROUP BY date(created_at) ORDER BY day", None),
+        ("SELECT l.original_url, l.created_at, u.display_name, u.zalo_id "
+         "FROM links l LEFT JOIN users u ON l.zalo_id=u.zalo_id "
+         "ORDER BY l.created_at DESC LIMIT 5", None),
+    ])
+    return {
+        "stats": {
+            "total_users": results[0]["rows"][0]["c"],
+            "total_links": results[1]["rows"][0]["c"],
+            "links_today": results[2]["rows"][0]["c"],
+            "links_7d": results[3]["rows"][0]["c"],
+            "users_new_7d": results[4]["rows"][0]["c"],
+            "users_active_7d": results[5]["rows"][0]["c"],
+        },
+        "daily": results[6]["rows"],
+        "recent": results[7]["rows"],
+    }
+
+
 async def admin_users_list(
     page: int = 1, per_page: int = 20, search: str = "", sort: str = "links_desc"
 ) -> dict:

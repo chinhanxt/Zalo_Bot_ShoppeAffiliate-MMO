@@ -19,7 +19,7 @@ import config
 from db import (
     init_db, upsert_user, log_link, get_user_stats,
     admin_dashboard_stats, admin_daily_stats, admin_users_list,
-    admin_user_detail, admin_links_list, admin_recent_activity,
+    admin_user_detail, admin_links_list, admin_recent_activity, admin_overview_batch,
     get_wallet, create_withdrawal,
     admin_withdrawals_list, admin_process_withdrawal, admin_update_commission,
     update_bank_info, get_bank_info,
@@ -537,6 +537,19 @@ async def admin_static(path: str):
     with open(os.path.join(ADMIN_DIR, "index.html")) as f:
         html = f.read().replace("/api/admin", _API_ADM)
     return HTMLResponse(html)
+
+
+@app.get(_API_ADM + "/overview")
+async def api_admin_overview():
+    data = await admin_overview_batch()
+    data["stats"]["affiliate_id_set"] = bool(config.AFFILIATE_ID)
+    data["shopee"] = await get_scraper_status()
+    data["config"] = {
+        "affiliate_id_set": bool(config.AFFILIATE_ID),
+        "zalo_bot_token_set": bool(config.ZALO_BOT_TOKEN),
+        "gemini_api_key_set": bool(config.GEMINI_API_KEY),
+    }
+    return data
 
 
 @app.get(_API_ADM + "/stats")

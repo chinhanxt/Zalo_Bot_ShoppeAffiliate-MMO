@@ -58,9 +58,15 @@ async def _cookie_string() -> str:
 
 
 async def get_scraper_status() -> dict:
-    cookies = await _load_cookies()
+    from db import kv_get
+    import asyncio
+    raw_cookies, raw_state = await asyncio.gather(
+        kv_get("shopee_cookies"),
+        kv_get("shopee_state"),
+    )
+    cookies = json.loads(raw_cookies) if raw_cookies else []
     has_cookies = len(cookies) > 0
-    state = await _load_state()
+    state = json.loads(raw_state) if raw_state else {}
     last_error = state.get("last_error", "")
     if has_cookies and last_error:
         status = "cookie_expired"
