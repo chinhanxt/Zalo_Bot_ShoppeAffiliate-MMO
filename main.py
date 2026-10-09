@@ -252,7 +252,7 @@ async def handle_user_message(result: dict):
     await upsert_user(tracking_id, display_name)
     cmd = text.lower().strip()
 
-    if cmd in ("vi", "ví", "wallet", "sodu", "số dư"):
+    if cmd in ("1", "vi", "ví", "wallet", "sodu", "số dư", "so du"):
         w = await get_wallet(tracking_id)
         reply = (
             f"👛 Ví của bạn\n"
@@ -270,7 +270,7 @@ async def handle_user_message(result: dict):
         await send_text(config.ZALO_BOT_TOKEN, chat_id, reply)
         return
 
-    if cmd in ("caidat", "cài đặt", "setting", "stk"):
+    if cmd in ("2", "caidat", "cài đặt", "cai dat", "setting", "stk", "ngân hàng", "ngan hang"):
         bank = await get_bank_info(tracking_id)
         if bank["bank_name"]:
             reply = (
@@ -315,7 +315,7 @@ async def handle_user_message(result: dict):
         )
         return
 
-    if cmd in ("ruttien", "rút tiền", "rut tien", "withdraw"):
+    if cmd in ("3", "ruttien", "rút tiền", "rut tien", "withdraw"):
         w = await get_wallet(tracking_id)
         bank = await get_bank_info(tracking_id)
         problems = []
@@ -400,7 +400,7 @@ async def handle_user_message(result: dict):
         )
         return
 
-    if cmd in ("thongke", "thống kê", "stats", "lịch sử"):
+    if cmd in ("4", "thongke", "thống kê", "thong ke", "stats", "lịch sử", "lich su"):
         stats = await get_user_stats(tracking_id)
         w = await get_wallet(tracking_id)
         reply = (
@@ -419,24 +419,22 @@ async def handle_user_message(result: dict):
         await send_text(config.ZALO_BOT_TOKEN, chat_id, reply)
         return
 
-    if cmd in ("help", "menu", "huong dan", "hướng dẫn", "start", "hi", "xin chao"):
+    if cmd in ("5", "help", "menu", "huong dan", "hướng dẫn", "huong dan", "start", "hi", "xin chao", "xin chào"):
         await send_text(
             config.ZALO_BOT_TOKEN, chat_id,
-            f"Chào {display_name or 'bạn'}! 👋 Mình là Bot Hoàn Tiền Mua Sắm!\n\n"
+            f"Chào {display_name or 'bạn'}! 👋\n\n"
+            f"📝 Lệnh nhanh (bấm số hoặc gõ tên):\n"
+            f"1 · Ví — xem số dư 👛\n"
+            f"2 · Cài đặt — lưu STK 🏦\n"
+            f"3 · Rút tiền — rút về TK 💸\n"
+            f"4 · Thống kê — xem lịch sử 📊\n"
+            f"5 · Hướng dẫn 📖\n"
+            f"🔗 Gửi link Shopee → nhận link hoàn tiền\n\n"
+            f"━━━━━━━━━━━━━━━\n"
             f"🛒 Cách nhận hoàn tiền:\n"
-            f"1️⃣ Gửi link Shopee vào đây\n"
-            f"2️⃣ Mình trả link hoàn tiền → mua qua link đó\n"
-            f"3️⃣ Đơn giao thành công + không hoàn trả\n"
-            f"4️⃣ Shopee xác nhận hoa hồng (~7-30 ngày)\n"
-            f"5️⃣ Tiền tự động vào ví → rút về ngân hàng!\n\n"
-            f"💰 Hoàn tiền ~1.5% giá trị đơn hàng\n\n"
-            f"📝 Các lệnh:\n"
-            f"• Gửi link Shopee → nhận link hoàn tiền\n"
-            f"• \"vi\" → xem ví + số dư 👛\n"
-            f"• \"caidat\" → lưu STK ngân hàng 🏦\n"
-            f"• \"ruttien\" → rút tiền 💸\n"
-            f"• \"thongke\" → thống kê 📊\n"
-            f"• \"help\" → hướng dẫn này"
+            f"Gửi link Shopee → mua qua link hoàn tiền → đơn thành công → Shopee xác nhận (~7-30 ngày) → tiền vào ví → rút về ngân hàng!\n\n"
+            f"💰 Hoàn ~1.5% giá trị đơn\n"
+            f"📋 VD: đơn 200.000đ → hoàn ~3.000đ"
         )
         return
 
