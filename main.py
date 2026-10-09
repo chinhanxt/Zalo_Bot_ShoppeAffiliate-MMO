@@ -44,6 +44,9 @@ logger = logging.getLogger(__name__)
 
 _db_initialized = False
 ADMIN_PASSWORD = config.ADMIN_PASSWORD
+ADMIN_SLUG = config.ADMIN_SLUG
+_ADM = f"/{ADMIN_SLUG}"
+_API_ADM = f"/api/{ADMIN_SLUG}"
 _active_sessions: dict[str, bool] = {}
 
 
@@ -89,7 +92,7 @@ app = FastAPI(title="Zalo Cashback Bot", version="1.0.0", lifespan=lifespan)
 async def ensure_db_middleware(request: Request, call_next):
     await _ensure_db()
     path = request.url.path
-    if path.startswith("/admin") or path.startswith("/api/admin"):
+    if path.startswith(_ADM) or path.startswith(_API_ADM):
         if path not in ("/login", "/api/auth/login", "/api/auth/logout"):
             if not _is_authed(request):
                 if path.startswith("/api/"):
@@ -107,7 +110,7 @@ async def ensure_db_middleware(request: Request, call_next):
 # ──────────────────────────────────────────────
 
 LOGIN_HTML = """<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Login · Cashback Bot</title>
+<title>Login · Zalo-Bot Shopee</title>
 <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap&subset=vietnamese" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -143,6 +146,7 @@ async function doLogin(e){
   else{document.getElementById('err').textContent=d.error||'Sai mật khẩu';}
 }
 </script></body></html>"""
+LOGIN_HTML = LOGIN_HTML.replace("='/admin'", f"='{_ADM}'")
 
 
 @app.get("/login")
@@ -513,32 +517,36 @@ async def test_link(url: str):
 ADMIN_DIR = os.path.join(os.path.dirname(__file__), "admin")
 
 
-@app.get("/admin")
+@app.get(_ADM)
 async def admin_page():
-    return FileResponse(os.path.join(ADMIN_DIR, "index.html"), media_type="text/html")
+    with open(os.path.join(ADMIN_DIR, "index.html")) as f:
+        html = f.read().replace("/api/admin", _API_ADM)
+    return HTMLResponse(html)
 
 
-@app.get("/admin/{path:path}")
+@app.get(_ADM + "/{path:path}")
 async def admin_static(path: str):
     fp = os.path.join(ADMIN_DIR, path)
     if os.path.isfile(fp):
         return FileResponse(fp)
-    return FileResponse(os.path.join(ADMIN_DIR, "index.html"), media_type="text/html")
+    with open(os.path.join(ADMIN_DIR, "index.html")) as f:
+        html = f.read().replace("/api/admin", _API_ADM)
+    return HTMLResponse(html)
 
 
-@app.get("/api/admin/stats")
+@app.get(_API_ADM + "/stats")
 async def api_admin_stats():
     stats = await admin_dashboard_stats()
     stats["affiliate_id_set"] = bool(config.AFFILIATE_ID)
     return stats
 
 
-@app.get("/api/admin/daily-stats")
+@app.get(_API_ADM + "/daily-stats")
 async def api_admin_daily(days: int = Query(default=7, ge=1, le=90)):
     return await admin_daily_stats(days)
 
 
-@app.get("/api/admin/users")
+@app.get(_API_ADM + "/users")
 async def api_admin_users(
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=100),
@@ -548,7 +556,7 @@ async def api_admin_users(
     return await admin_users_list(page, per_page, search, sort)
 
 
-@app.get("/api/admin/users/{zalo_id}")
+@app.get(_API_ADM + "/users/{zalo_id}")
 async def api_admin_user_detail(zalo_id: str):
     user = await admin_user_detail(zalo_id)
     if not user:
@@ -556,7 +564,7 @@ async def api_admin_user_detail(zalo_id: str):
     return user
 
 
-@app.get("/api/admin/links")
+@app.get(_API_ADM + "/links")
 async def api_admin_links(
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=100),
@@ -566,12 +574,12 @@ async def api_admin_links(
     return await admin_links_list(page, per_page, search, user)
 
 
-@app.get("/api/admin/recent")
+@app.get(_API_ADM + "/recent")
 async def api_admin_recent(limit: int = Query(default=5, ge=1, le=20)):
     return await admin_recent_activity(limit)
 
 
-@app.get("/api/admin/config")
+@app.get(_API_ADM + "/config")
 async def api_admin_config():
     aff = config.AFFILIATE_ID
     token = config.ZALO_BOT_TOKEN
@@ -595,7 +603,7 @@ async def api_admin_config():
 ENV_KEYS = {"AFFILIATE_ID", "ZALO_BOT_TOKEN", "ZALO_WEBHOOK_SECRET", "GEMINI_API_KEY"}
 
 
-@app.post("/api/admin/config")
+@app.post(_API_ADM + "/config")
 async def api_admin_config_update(request: Request):
     body = await request.json()
     updated = []
@@ -608,17 +616,17 @@ async def api_admin_config_update(request: Request):
     return {"ok": True, "updated": updated}
 
 
-@app.post("/api/admin/test-gemini")
+@app.post(_API_ADM + "/test-gemini")
 async def api_admin_test_gemini():
     return await test_gemini_key(config.GEMINI_API_KEY)
 
 
-@app.get("/api/admin/withdrawals")
+@app.get(_API_ADM + "/withdrawals")
 async def api_admin_withdrawals(status: str = ""):
     return await admin_withdrawals_list(status)
 
 
-@app.post("/api/admin/withdrawals/{wid}/process")
+@app.post(_API_ADM + "/withdrawals/{wid}/process")
 async def api_admin_process_withdrawal(wid: int, request: Request):
     body = await request.json()
     action = body.get("action", "")
@@ -652,7 +660,7 @@ async def api_admin_process_withdrawal(wid: int, request: Request):
     return result
 
 
-@app.post("/api/admin/links/{link_id}/commission")
+@app.post(_API_ADM + "/links/{link_id}/commission")
 async def api_admin_set_commission(link_id: int, request: Request):
     body = await request.json()
     return await admin_update_commission(link_id, float(body.get("commission_user", 0)))
@@ -662,12 +670,12 @@ async def api_admin_set_commission(link_id: int, request: Request):
 # Notifications
 # ──────────────────────────────────────────────
 
-@app.get("/api/admin/notifications")
+@app.get(_API_ADM + "/notifications")
 async def api_admin_notifications():
     return await notifications_list()
 
 
-@app.post("/api/admin/notifications/send")
+@app.post(_API_ADM + "/notifications/send")
 async def api_admin_send_notification(request: Request):
     body = await request.json()
     message = body.get("message", "").strip()
@@ -699,12 +707,12 @@ async def api_admin_send_notification(request: Request):
 # Scheduled messages
 # ──────────────────────────────────────────────
 
-@app.get("/api/admin/scheduled")
+@app.get(_API_ADM + "/scheduled")
 async def api_admin_scheduled():
     return await scheduled_list()
 
 
-@app.post("/api/admin/scheduled")
+@app.post(_API_ADM + "/scheduled")
 async def api_admin_scheduled_create(request: Request):
     body = await request.json()
     message = body.get("message", "").strip()
@@ -715,13 +723,13 @@ async def api_admin_scheduled_create(request: Request):
     return {"ok": True, "id": sid}
 
 
-@app.post("/api/admin/scheduled/{sid}/toggle")
+@app.post(_API_ADM + "/scheduled/{sid}/toggle")
 async def api_admin_scheduled_toggle(sid: int, request: Request):
     body = await request.json()
     return await scheduled_toggle(sid, int(body.get("is_active", 0)))
 
 
-@app.delete("/api/admin/scheduled/{sid}")
+@app.delete(_API_ADM + "/scheduled/{sid}")
 async def api_admin_scheduled_del(sid: int):
     return await scheduled_delete(sid)
 
@@ -730,12 +738,12 @@ async def api_admin_scheduled_del(sid: int):
 # Shopee Affiliate Scraper
 # ──────────────────────────────────────────────
 
-@app.get("/api/admin/shopee/status")
+@app.get(_API_ADM + "/shopee/status")
 async def api_shopee_status():
     return await get_scraper_status()
 
 
-@app.post("/api/admin/shopee/cookies")
+@app.post(_API_ADM + "/shopee/cookies")
 async def api_shopee_cookies(request: Request):
     body = await request.json()
     if isinstance(body, list):
@@ -749,12 +757,12 @@ async def api_shopee_cookies(request: Request):
     return {"ok": False, "error": "Gửi JSON array cookies hoặc {cookie_string: '...'}"}
 
 
-@app.post("/api/admin/shopee/verify")
+@app.post(_API_ADM + "/shopee/verify")
 async def api_shopee_verify():
     return await verify_cookies()
 
 
-@app.post("/api/admin/shopee/sync")
+@app.post(_API_ADM + "/shopee/sync")
 async def api_shopee_sync():
     result = await scrape_conversions(days=30)
     if not result.get("ok"):
@@ -765,7 +773,7 @@ async def api_shopee_sync():
     return result
 
 
-@app.post("/api/admin/shopee/interval")
+@app.post(_API_ADM + "/shopee/interval")
 async def api_shopee_interval(request: Request):
     body = await request.json()
     hours = int(body.get("hours", 6))
