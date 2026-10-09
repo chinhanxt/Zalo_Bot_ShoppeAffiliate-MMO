@@ -6,11 +6,13 @@ User gửi link Shopee → Bot trả link affiliate (an_redir).
 import logging
 import json
 import os
+import hashlib
+import secrets
 
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 import uvicorn
 
 import config
@@ -41,6 +43,12 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 _db_initialized = False
+ADMIN_PASSWORD = config.ADMIN_PASSWORD
+_active_sessions: dict[str, bool] = {}
+
+
+def _hash_pw(pw: str) -> str:
+    return hashlib.sha256(pw.encode()).hexdigest()
 
 
 async def _ensure_db():
@@ -56,6 +64,15 @@ async def _load_config_overrides():
         val = await kv_get(f"config_{key}")
         if val is not None and val != "":
             setattr(config, key, val)
+    saved_sessions = await kv_get("admin_sessions")
+    if saved_sessions:
+        for sid in json.loads(saved_sessions):
+            _active_sessions[sid] = True
+
+
+def _is_authed(request: Request) -> bool:
+    sid = request.cookies.get("session_id", "")
+    return bool(sid and _active_sessions.get(sid))
 
 
 @asynccontextmanager
@@ -71,7 +88,97 @@ app = FastAPI(title="Zalo Cashback Bot", version="1.0.0", lifespan=lifespan)
 @app.middleware("http")
 async def ensure_db_middleware(request: Request, call_next):
     await _ensure_db()
+    path = request.url.path
+    if path.startswith("/admin") or path.startswith("/api/admin"):
+        if path not in ("/login", "/api/auth/login", "/api/auth/logout"):
+            if not _is_authed(request):
+                if path.startswith("/api/"):
+                    return Response(
+                        content=json.dumps({"error": "Unauthorized"}),
+                        status_code=401,
+                        media_type="application/json",
+                    )
+                return RedirectResponse("/login")
     return await call_next(request)
+
+
+# ──────────────────────────────────────────────
+# Auth: Login / Logout
+# ──────────────────────────────────────────────
+
+LOGIN_HTML = """<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Login · Cashback Bot</title>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap&subset=vietnamese" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Be Vietnam Pro",system-ui,sans-serif;background:#F7F6F3;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.box{background:#fff;border:1px solid #eaeaea;border-radius:18px;box-shadow:0 1px 2px rgba(17,17,17,.03),0 6px 20px rgba(17,17,17,.035);padding:40px;width:380px;text-align:center}
+.logo{width:56px;height:56px;border-radius:16px;background:#EE4D2D;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;margin-bottom:16px}
+h1{font-size:22px;font-weight:700;letter-spacing:-0.02em;margin-bottom:6px}
+.sub{font-size:14px;color:#787774;margin-bottom:28px}
+input{width:100%;height:48px;border-radius:12px;border:1px solid #eaeaea;padding:0 16px;font:inherit;font-size:15px;outline:none;transition:border .15s}
+input:focus{border-color:#111}
+.btn{width:100%;height:48px;border-radius:999px;background:#111;color:#fff;border:0;font:inherit;font-size:15px;font-weight:600;cursor:pointer;margin-top:16px}
+.btn:hover{background:#333}
+.err{color:#B3261E;font-size:13px;margin-top:12px;min-height:18px}
+</style></head><body>
+<div class="box">
+<div class="logo">CB</div>
+<h1>Cashback Bot Admin</h1>
+<p class="sub">Đăng nhập để quản lý bot</p>
+<form onsubmit="return doLogin(event)">
+<input type="password" id="pw" placeholder="Mật khẩu" autofocus>
+<button class="btn" type="submit">Đăng nhập</button>
+</form>
+<div class="err" id="err"></div>
+</div>
+<script>
+async function doLogin(e){
+  e.preventDefault();
+  const pw=document.getElementById('pw').value;
+  if(!pw)return;
+  const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+  const d=await r.json();
+  if(d.ok){window.location='/admin';}
+  else{document.getElementById('err').textContent=d.error||'Sai mật khẩu';}
+}
+</script></body></html>"""
+
+
+@app.get("/login")
+async def login_page():
+    return HTMLResponse(LOGIN_HTML)
+
+
+@app.post("/api/auth/login")
+async def api_auth_login(request: Request):
+    body = await request.json()
+    pw = body.get("password", "")
+    if _hash_pw(pw) != _hash_pw(ADMIN_PASSWORD):
+        return Response(
+            content=json.dumps({"ok": False, "error": "Sai mật khẩu"}),
+            status_code=401,
+            media_type="application/json",
+        )
+    sid = secrets.token_hex(32)
+    _active_sessions[sid] = True
+    await kv_set("admin_sessions", json.dumps(list(_active_sessions.keys())[-10:]))
+    resp = Response(
+        content=json.dumps({"ok": True}),
+        media_type="application/json",
+    )
+    resp.set_cookie("session_id", sid, httponly=True, secure=True, samesite="lax", max_age=86400 * 30)
+    return resp
+
+
+@app.post("/api/auth/logout")
+async def api_auth_logout(request: Request):
+    sid = request.cookies.get("session_id", "")
+    _active_sessions.pop(sid, None)
+    await kv_set("admin_sessions", json.dumps(list(_active_sessions.keys())[-10:]))
+    resp = RedirectResponse("/login")
+    resp.delete_cookie("session_id")
+    return resp
 
 
 # ──────────────────────────────────────────────

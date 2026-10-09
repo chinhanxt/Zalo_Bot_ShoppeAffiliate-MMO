@@ -180,7 +180,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--on);-webkit-font-s
   <div class="brand"><div class="logo">CB</div><div><div class="n">Cashback Bot</div><div class="d">Bảng quản trị</div></div></div>
   <div class="nav-label">Quản lý</div>
   <nav class="nav" id="nav"></nav>
-  <div class="side-foot"><div class="bubble sm">AD</div><div style="min-width:0;flex:1"><div class="t1">Admin</div><div class="t2">Bot Manager</div></div></div>
+  <div class="side-foot"><div class="bubble sm">AD</div><div style="min-width:0;flex:1"><div class="t1">Admin</div><div class="t2">Bot Manager</div></div><a onclick="doLogout()" style="cursor:pointer;font-size:12px;color:var(--on-v);text-decoration:underline" title="Đăng xuất">Logout</a></div>
 </aside>
 
 <!-- Main content -->
@@ -220,7 +220,8 @@ function renderNav() {
 }
 
 /* ═══════════════ API helpers ═══════════════ */
-const api = (path) => fetch(path).then(r=>r.json());
+async function doLogout(){if(confirm('Đăng xuất?')){await fetch('/api/auth/logout',{method:'POST'});window.location='/login';}}
+const api = (path) => fetch(path).then(r=>{if(r.status===401){window.location='/login';return{}}return r.json()});
 const $ = id => document.getElementById(id);
 const fmt = v => (v??0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 const esc = s => s ? String(s).replace(/</g,'&lt;') : '';
