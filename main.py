@@ -235,6 +235,38 @@ def _fmt_vnd(amount: float) -> str:
     return fmt_vnd(amount)
 
 
+import re as _re
+
+def _parse_vnd(text: str) -> float | None:
+    s = text.lower().strip()
+    s = _re.sub(r'[đ₫vndd\s]', '', s)
+    if not s:
+        return None
+    m = _re.match(r'^(\d+[.,]?\d*)\s*tr(\d+)?$', s)
+    if m:
+        base = float(m.group(1).replace(',', '.')) * 1_000_000
+        frac = int(m.group(2)) * 100_000 if m.group(2) else 0
+        return base + frac
+    m = _re.match(r'^(\d+[.,]?\d*)\s*trieu$', s)
+    if m:
+        return float(m.group(1).replace(',', '.')) * 1_000_000
+    m = _re.match(r'^(\d+[.,]?\d*)\s*k$', s)
+    if m:
+        return float(m.group(1).replace(',', '.')) * 1_000
+    m = _re.match(r'^(\d+[.,]?\d*)\s*(ngan|nghin|ngàn|nghìn)$', s)
+    if m:
+        return float(m.group(1).replace(',', '.')) * 1_000
+    m = _re.match(r'^[\d.,]+$', s)
+    if m:
+        cleaned = s.replace('.', '').replace(',', '')
+        if cleaned.isdigit() and int(cleaned) >= 1000:
+            return float(cleaned)
+    return None
+
+
+CASHBACK_RATE = 0.015
+
+
 async def handle_user_message(result: dict):
     msg = result.get("message", {})
     sender = msg.get("from", {})
@@ -429,12 +461,63 @@ async def handle_user_message(result: dict):
             f"3 · Rút tiền — rút về TK 💸\n"
             f"4 · Thống kê — xem lịch sử 📊\n"
             f"5 · Hướng dẫn 📖\n"
-            f"🔗 Gửi link Shopee → nhận link hoàn tiền\n\n"
+            f"6 · Tính nhận tiền — VD: 6 200k 🧮\n"
+            f"🔗 Gửi link Shopee → nhận link nhận tiền\n\n"
             f"━━━━━━━━━━━━━━━\n"
-            f"🛒 Cách nhận hoàn tiền:\n"
-            f"Gửi link Shopee → mua qua link hoàn tiền → đơn thành công → Shopee xác nhận (~7-30 ngày) → tiền vào ví → rút về ngân hàng!\n\n"
-            f"💰 Hoàn ~1.5% giá trị đơn\n"
-            f"📋 VD: đơn 200.000đ → hoàn ~3.000đ"
+            f"🛒 Cách nhận nhận tiền:\n"
+            f"Gửi link Shopee → mua qua link nhận tiền → đơn thành công → Shopee xác nhận (~7-30 ngày) → tiền vào ví → rút về ngân hàng!\n\n"
+            f"💰 Nhận ~1.5% giá trị đơn\n"
+            f"📋 VD: đơn 200.000đ → nhận ~3.000đ"
+        )
+        return
+
+    tinh_match = _re.match(r'^(?:6|tinh|tính|tính tiền|tinhtien)\s+(.+)$', cmd)
+    if tinh_match:
+        amount = _parse_vnd(tinh_match.group(1))
+        if amount and amount >= 1000:
+            cashback = round(amount * CASHBACK_RATE)
+            await send_text(
+                config.ZALO_BOT_TOKEN, chat_id,
+                f"🧮 Ước tính nhận tiền\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"🛒 Giá đơn: {_fmt_vnd(amount)}\n"
+                f"💰 Nhận ~{_fmt_vnd(cashback)}\n\n"
+                f"📌 Đây là ước tính (~1.5%), thực tế tuỳ ngành hàng có thể cao hơn!\n"
+                f"Gửi link Shopee để nhận link nhận tiền nha 🛒"
+            )
+        else:
+            await send_text(
+                config.ZALO_BOT_TOKEN, chat_id,
+                f"🤔 Mình không hiểu số tiền. Thử lại nhé!\n"
+                f"VD: 6 200k · 6 1tr5 · 6 500.000"
+            )
+        return
+
+    if cmd in ("6", "tinh", "tính", "tính tiền", "tinhtien"):
+        await send_text(
+            config.ZALO_BOT_TOKEN, chat_id,
+            f"🧮 Tính nhận tiền\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"Nhập giá đơn hàng để tính:\n\n"
+            f"VD:\n"
+            f"• 6 200k → nhận ~{_fmt_vnd(round(200000 * CASHBACK_RATE))}\n"
+            f"• 6 1tr5 → nhận ~{_fmt_vnd(round(1500000 * CASHBACK_RATE))}\n"
+            f"• 6 500.000 → nhận ~{_fmt_vnd(round(500000 * CASHBACK_RATE))}\n\n"
+            f"💡 Gõ: 6 [giá đơn]"
+        )
+        return
+
+    bare_amount = _parse_vnd(text)
+    if bare_amount and bare_amount >= 1000:
+        cashback = round(bare_amount * CASHBACK_RATE)
+        await send_text(
+            config.ZALO_BOT_TOKEN, chat_id,
+            f"🧮 Ước tính nhận tiền\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"🛒 Giá đơn: {_fmt_vnd(bare_amount)}\n"
+            f"💰 Nhận ~{_fmt_vnd(cashback)}\n\n"
+            f"📌 Đây là ước tính (~1.5%), thực tế tuỳ ngành hàng có thể cao hơn!\n"
+            f"Gửi link Shopee để nhận link nhận tiền nha 🛒"
         )
         return
 
@@ -455,7 +538,7 @@ async def handle_user_message(result: dict):
             if ai_count >= ai_limit:
                 await send_text(
                     config.ZALO_BOT_TOKEN, chat_id,
-                    "Gửi link sản phẩm Shopee cho mình để nhận hoàn tiền nhé! 🛒\n"
+                    "Gửi link sản phẩm Shopee cho mình để nhận nhận tiền nhé! 🛒\n"
                     "Gõ \"help\" để xem hướng dẫn 👋",
                 )
                 return
@@ -468,7 +551,7 @@ async def handle_user_message(result: dict):
             await send_text(
                 config.ZALO_BOT_TOKEN, chat_id,
                 f"🤔 Mình không thấy link Shopee nha!\n"
-                f"Gửi link shopee.vn hoặc shp.ee để nhận hoàn tiền 🛒\n"
+                f"Gửi link shopee.vn hoặc shp.ee để nhận nhận tiền 🛒\n"
                 f"Gõ \"help\" để xem hướng dẫn 😊"
             )
         return
@@ -490,17 +573,21 @@ async def handle_user_message(result: dict):
 
     if len(results) == 1:
         reply = (
-            f"🎉 Link hoàn tiền của bạn:\n\n"
+            f"🎉 Link nhận tiền của bạn:\n\n"
             f"🔗 {results[0]}\n\n"
-            f"💲 Hoàn ~1.5% giá trị đơn\n"
-            f"📋 VD: đơn 200.000đ → hoàn ~3.000đ\n"
-            f"📌 Mua qua link → đơn thành công → tiền tự vào ví!"
+            f"💲 Nhận ~1.5% giá trị đơn\n"
+            f"📌 Mua qua link → đơn thành công → tiền tự vào ví!\n\n"
+            f"💡 Gõ \"6 [giá đơn]\" để tính nhận tiền\n"
+            f"VD: 6 200k · 6 1tr5 · 6 500.000"
         )
     else:
-        reply = f"🎉 {len(results)} link hoàn tiền:\n\n"
+        reply = f"🎉 {len(results)} link nhận tiền:\n\n"
         for i, lk in enumerate(results, 1):
             reply += f"{i}. {lk}\n"
-        reply += f"\n💰 Hoàn ~1.5%/đơn · Đơn thành công → tiền vào ví!"
+        reply += (
+            f"\n💰 Nhận ~1.5%/đơn · Đơn thành công → tiền vào ví!\n\n"
+            f"💡 Gõ \"6 [giá đơn]\" để tính nhận tiền"
+        )
 
     await send_text(config.ZALO_BOT_TOKEN, chat_id, reply)
 
@@ -658,8 +745,8 @@ async def api_admin_test_gemini():
 
 
 @app.get(_API_ADM + "/withdrawals")
-async def api_admin_withdrawals(status: str = ""):
-    return await admin_withdrawals_list(status)
+async def api_admin_withdrawals(page: int = 1, per_page: int = 10, status: str = ""):
+    return await admin_withdrawals_list(page, per_page, status)
 
 
 @app.post(_API_ADM + "/withdrawals/{wid}/process")
@@ -683,7 +770,7 @@ async def api_admin_process_withdrawal(wid: int, request: Request):
         else:
             msg = (
                 f"😔 Yêu cầu rút tiền #{wid} bị từ chối.\n\n"
-                f"💰 Số tiền: {_fmt_vnd(amount)} đã hoàn về ví.\n"
+                f"💰 Số tiền: {_fmt_vnd(amount)} đã trả về ví.\n"
                 f"📝 Lý do: {note or 'Không có'}\n\n"
                 f"Liên hệ admin nếu cần hỗ trợ nhé!"
             )
@@ -707,8 +794,8 @@ async def api_admin_set_commission(link_id: int, request: Request):
 # ──────────────────────────────────────────────
 
 @app.get(_API_ADM + "/notifications")
-async def api_admin_notifications():
-    return await notifications_list()
+async def api_admin_notifications(page: int = 1, per_page: int = 10):
+    return await notifications_list(page, per_page)
 
 
 @app.post(_API_ADM + "/notifications/send")

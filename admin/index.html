@@ -294,7 +294,7 @@ async function renderOverview() {
   if (!cfg.gemini_api_key_set) warnings += `<div style="background:#FFF8E1;border:1px solid #F9A825;border-radius:var(--r-sm);padding:12px 20px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="navigate('config')"><span style="font-size:18px">💡</span><span style="font-weight:600;color:#E65100;font-size:14px">Gemini API Key chưa cấu hình — AI chatbot sẽ không hoạt động</span></div>`;
 
   $('app').innerHTML = `
-    <div class="page-h"><div><h1 class="headline">Tổng quan</h1><div class="sub">Hệ thống bot hoàn tiền Shopee qua Zalo</div></div>
+    <div class="page-h"><div><h1 class="headline">Tổng quan</h1><div class="sub">Hệ thống bot nhận tiền Shopee qua Zalo</div></div>
       <div class="acts"><button class="btn btn-secondary" onclick="_clearCache();navigate('overview')">${svg('refresh-cw')} Làm mới</button></div></div>
     ${warnings}
     <div class="grid grid-4">
@@ -352,7 +352,7 @@ function renderChart7d(data) {
 let usersPage=1, usersSearch='', usersSort='links_desc';
 
 async function renderUsers() {
-  const data = await api(`/api/admin/users?page=${usersPage}&per_page=15&search=${encodeURIComponent(usersSearch)}&sort=${usersSort}`);
+  const data = await api(`/api/admin/users?page=${usersPage}&per_page=10&search=${encodeURIComponent(usersSearch)}&sort=${usersSort}`);
   userCount = fmt(data.total);
   renderNav();
 
@@ -439,7 +439,7 @@ async function renderUserDetail(zaloId) {
 let linksPage=1, linksSearch='', linksUser='';
 
 async function renderLinks() {
-  const data = await api(`/api/admin/links?page=${linksPage}&per_page=15&search=${encodeURIComponent(linksSearch)}&user=${encodeURIComponent(linksUser)}`);
+  const data = await api(`/api/admin/links?page=${linksPage}&per_page=10&search=${encodeURIComponent(linksSearch)}&user=${encodeURIComponent(linksUser)}`);
 
   const rows = data.items.map(l => {
     const st = l.status || 'pending';
@@ -536,8 +536,9 @@ function exportCSV() {
 
 /* ═══════════════ WITHDRAWALS ═══════════════ */
 
+let wdPage=1, wdStatus='';
 async function renderWithdrawals() {
-  const data = await api('/api/admin/withdrawals');
+  const data = await api(`/api/admin/withdrawals?page=${wdPage}&per_page=10&status=${encodeURIComponent(wdStatus)}`);
 
   const statusBadge = s => {
     if (s==='approved') return '<span class="badge ok">Đã duyệt</span>';
@@ -545,9 +546,9 @@ async function renderWithdrawals() {
     return '<span class="badge" style="background:var(--zalo-c);color:var(--zalo)">Chờ duyệt</span>';
   };
 
-  const pending = data.filter(w => w.status==='pending');
+  const pendingCount = data.items.filter(w => w.status==='pending').length;
 
-  const rows = data.map(w => `<tr>
+  const rows = data.items.map(w => `<tr>
     <td class="num fw6">#${w.id}</td>
     <td><div class="cell-user"><div class="bubble sm">${initials(w.display_name)}</div><div><div class="t1" style="font-size:13.5px">${esc(w.display_name||shortId(w.zalo_id))}</div></div></div></td>
     <td class="num fw6" style="color:var(--shopee)">${fmtVnd(w.amount)}</td>
@@ -558,11 +559,21 @@ async function renderWithdrawals() {
   </tr>`).join('');
 
   $('app').innerHTML = `
-    <div class="page-h"><div><h1 class="headline">Rút tiền</h1><div class="sub">${pending.length} yêu cầu chờ duyệt</div></div></div>
+    <div class="page-h"><div><h1 class="headline">Rút tiền</h1><div class="sub">${data.total} yêu cầu${pendingCount?' · '+pendingCount+' chờ duyệt':''}</div></div>
+      <div class="acts">
+        <div class="field" style="width:160px"><select onchange="wdStatus=this.value;wdPage=1;renderWithdrawals()">
+          <option value=""${wdStatus===''?' selected':''}>Tất cả</option>
+          <option value="pending"${wdStatus==='pending'?' selected':''}>Chờ duyệt</option>
+          <option value="approved"${wdStatus==='approved'?' selected':''}>Đã duyệt</option>
+          <option value="rejected"${wdStatus==='rejected'?' selected':''}>Từ chối</option>
+        </select></div>
+        <button class="btn btn-secondary" onclick="_clearCache();renderWithdrawals()">${svg('refresh-cw')} Làm mới</button>
+      </div></div>
     <div class="card flush">
       <table class="tbl">
       <thead><tr><th style="width:60px">#</th><th>Người dùng</th><th>Số tiền</th><th>Ngân hàng</th><th>Trạng thái</th><th>Ngày</th><th style="width:200px">Thao tác</th></tr></thead>
       <tbody>${rows||'<tr><td colspan="7"><div class="empty" style="padding:40px"><div class="title-l">Chưa có yêu cầu rút tiền nào</div></div></td></tr>'}</tbody></table>
+      ${data.pages>1 ? renderPager(data.page, data.pages, p=>{wdPage=p;renderWithdrawals()}) : ''}
     </div>`;
 }
 
@@ -702,10 +713,11 @@ function _typeBadge(t) {
   return '<span class="badge">Tuỳ chỉnh</span>';
 }
 
+let notiPage=1;
 async function renderNotifications() {
-  const notifs = await api('/api/admin/notifications');
+  const data = await api(`/api/admin/notifications?page=${notiPage}&per_page=10`);
 
-  const notifRows = notifs.map(n => `<tr>
+  const notifRows = data.items.map(n => `<tr>
     <td class="muted num">${fmtDate(n.created_at)}</td>
     <td>${_typeBadge(n.type)}</td>
     <td>${n.zalo_id ? `<div class="cell-user"><div class="bubble sm">${initials(n.display_name)}</div><div><div class="t1" style="font-size:13px">${esc(n.display_name||shortId(n.zalo_id))}</div></div></div>` : '<span class="muted">Tất cả</span>'}</td>
@@ -714,12 +726,13 @@ async function renderNotifications() {
   </tr>`).join('');
 
   $('app').innerHTML = `
-    <div class="page-h"><div><h1 class="headline">Thông báo</h1><div class="sub">Lịch sử thông báo đã gửi cho user</div></div>
-      <div class="acts"><button class="btn btn-secondary" onclick="_clearCache();navigate('notifications')">${svg('refresh-cw')} Làm mới</button></div></div>
+    <div class="page-h"><div><h1 class="headline">Thông báo</h1><div class="sub">${data.total} thông báo</div></div>
+      <div class="acts"><button class="btn btn-secondary" onclick="_clearCache();notiPage=1;renderNotifications()">${svg('refresh-cw')} Làm mới</button></div></div>
     <div class="card flush">
       <table class="tbl">
       <thead><tr><th style="width:150px">Thời gian</th><th style="width:100px">Loại</th><th style="width:180px">Người nhận</th><th>Nội dung</th><th style="width:60px" class="r">Gửi</th></tr></thead>
       <tbody>${notifRows||'<tr><td colspan="5"><div class="empty" style="padding:40px"><div class="title-l">Chưa có thông báo nào</div><div class="sub mt-2">Thông báo sẽ xuất hiện khi admin duyệt/từ chối rút tiền hoặc gửi tin nhắn</div></div></td></tr>'}</tbody></table>
+      ${data.pages>1 ? renderPager(data.page, data.pages, p=>{notiPage=p;renderNotifications()}) : ''}
     </div>`;
 }
 
@@ -930,7 +943,7 @@ async function renderConfig() {
   _cfgDirty = false;
 
   $('app').innerHTML = `
-    <div class="page-h"><div><h1 class="headline">Cấu hình</h1><div class="sub">Thiết lập bot hoàn tiền và kết nối Zalo Bot</div></div>
+    <div class="page-h"><div><h1 class="headline">Cấu hình</h1><div class="sub">Thiết lập bot nhận tiền và kết nối Zalo Bot</div></div>
       <div class="acts"><button id="cfg-save" class="btn btn-primary" disabled onclick="saveConfig()">${svg('check')} Lưu thay đổi</button></div></div>
     <div style="display:flex;flex-direction:column;gap:20px">
       <div class="card scard">

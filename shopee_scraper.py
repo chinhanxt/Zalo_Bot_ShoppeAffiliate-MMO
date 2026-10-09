@@ -320,7 +320,7 @@ async def sync_commissions_to_wallets(conversions: list[dict]) -> dict:
                 f"💰 +{fmt_vnd(n['commission'])} vào ví\n"
                 f"📦 Đơn hàng: #{n['order_id']}\n\n"
                 f"Gõ \"vi\" để xem số dư 👛\n"
-                f"Tiếp tục mua sắm qua link hoàn tiền nha! 🛒"
+                f"Tiếp tục mua sắm qua link nhận tiền nha! 🛒"
             )
             await send_text(config.ZALO_BOT_TOKEN, n["zalo_id"], msg)
             await log_notification(n["zalo_id"], "commission", msg)

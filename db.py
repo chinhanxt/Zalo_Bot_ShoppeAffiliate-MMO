@@ -310,16 +310,26 @@ async def create_withdrawal(zalo_id: str, amount: float, bank_info: str) -> dict
     return {"ok": True, "id": results[0]["last_insert_rowid"]}
 
 
-async def admin_withdrawals_list(status: str = "") -> list[dict]:
+async def admin_withdrawals_list(
+    page: int = 1, per_page: int = 10, status: str = ""
+) -> dict:
     where = "WHERE w.status = ?" if status else ""
     params = [status] if status else []
-    r = await turso.execute(
-        f"SELECT w.*, u.display_name FROM withdrawals w "
-        f"LEFT JOIN users u ON w.zalo_id=u.zalo_id "
-        f"{where} ORDER BY w.created_at DESC LIMIT 100",
-        params,
-    )
-    return r["rows"]
+    results = await turso.execute_batch([
+        (f"SELECT COUNT(*) c FROM withdrawals w {where}", params),
+        (f"SELECT w.*, u.display_name FROM withdrawals w "
+         f"LEFT JOIN users u ON w.zalo_id=u.zalo_id "
+         f"{where} ORDER BY w.created_at DESC LIMIT ? OFFSET ?",
+         params + [per_page, (page - 1) * per_page]),
+    ])
+    total = results[0]["rows"][0]["c"]
+    return {
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "pages": (total + per_page - 1) // per_page if per_page else 1,
+        "items": results[1]["rows"],
+    }
 
 
 async def admin_process_withdrawal(wid: int, action: str, note: str = "") -> dict:
@@ -361,14 +371,24 @@ async def log_notification(zalo_id: str, msg_type: str, message: str, sent_count
     )
 
 
-async def notifications_list(limit: int = 50) -> list[dict]:
-    r = await turso.execute(
-        "SELECT n.*, u.display_name FROM notifications n "
-        "LEFT JOIN users u ON n.zalo_id=u.zalo_id "
-        "ORDER BY n.created_at DESC LIMIT ?",
-        [limit],
-    )
-    return r["rows"]
+async def notifications_list(
+    page: int = 1, per_page: int = 10
+) -> dict:
+    results = await turso.execute_batch([
+        ("SELECT COUNT(*) c FROM notifications", []),
+        ("SELECT n.*, u.display_name FROM notifications n "
+         "LEFT JOIN users u ON n.zalo_id=u.zalo_id "
+         "ORDER BY n.created_at DESC LIMIT ? OFFSET ?",
+         [per_page, (page - 1) * per_page]),
+    ])
+    total = results[0]["rows"][0]["c"]
+    return {
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "pages": (total + per_page - 1) // per_page if per_page else 1,
+        "items": results[1]["rows"],
+    }
 
 
 # ──────────────────────────────────────────────
