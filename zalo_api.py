@@ -26,6 +26,22 @@ async def send_text(bot_token: str, chat_id: str, text: str):
         return data
 
 
+async def send_photo(bot_token: str, chat_id: str, photo_url: str, caption: str = ""):
+    url = f"{BOT_API_BASE}{bot_token}/sendPhoto"
+    payload = {
+        "chat_id": chat_id,
+        "photo": photo_url,
+    }
+    if caption:
+        payload["caption"] = caption
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(url, json=payload)
+        data = resp.json()
+        if not data.get("ok"):
+            logger.error("sendPhoto failed: %s", data)
+        return data
+
+
 async def set_webhook(bot_token: str, webhook_url: str, secret_token: str):
     """Đăng ký webhook URL với Zalo Bot."""
     url = f"{BOT_API_BASE}{bot_token}/setWebhook"

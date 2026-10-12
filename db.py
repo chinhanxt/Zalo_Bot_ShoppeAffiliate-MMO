@@ -3,7 +3,15 @@ Turso cloud DB — lưu user Zalo + lịch sử link đã chuyển.
 Thay thế aiosqlite, dùng Turso HTTP API qua module turso.py.
 """
 
+import secrets
+import string
+
 import turso
+
+
+def _gen_code(length: int = 6) -> str:
+    alphabet = string.ascii_letters + string.digits
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 SCHEMA_STATEMENTS = [
     """CREATE TABLE IF NOT EXISTS users (
@@ -16,6 +24,8 @@ SCHEMA_STATEMENTS = [
     """CREATE TABLE IF NOT EXISTS links (
         id INTEGER PRIMARY KEY AUTOINCREMENT, zalo_id TEXT NOT NULL,
         original_url TEXT NOT NULL, affiliate_url TEXT NOT NULL,
+        short_code TEXT UNIQUE,
+        click_count INTEGER DEFAULT 0,
         commission_user REAL DEFAULT 0, status TEXT DEFAULT 'pending',
         conversion_id TEXT DEFAULT '',
         created_at TEXT DEFAULT (datetime('now')),
@@ -47,7 +57,20 @@ SCHEMA_STATEMENTS = [
 
 async def init_db():
     stmts = [(sql, None) for sql in SCHEMA_STATEMENTS]
-    await turso.execute_batch(stmts)
+    for sql, params in stmts:
+        try:
+            await turso.execute(sql, params or [])
+        except Exception:
+            pass
+    for migration in [
+        "ALTER TABLE links ADD COLUMN short_code TEXT",
+        "ALTER TABLE links ADD COLUMN click_count INTEGER DEFAULT 0",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_links_short_code ON links(short_code)",
+    ]:
+        try:
+            await turso.execute(migration)
+        except Exception:
+            pass
 
 
 # ──────────────────────────────────────────────
@@ -81,13 +104,44 @@ async def upsert_user(zalo_id: str, display_name: str = ""):
     )
 
 
-async def log_link(zalo_id: str, original_url: str, affiliate_url: str):
-    await turso.execute_batch([
-        ("INSERT INTO links (zalo_id, original_url, affiliate_url) VALUES (?, ?, ?)",
-         [zalo_id, original_url, affiliate_url]),
+async def log_link(zalo_id: str, original_url: str, affiliate_url: str, display_name: str = "") -> str:
+    existing = await turso.execute(
+        "SELECT short_code FROM links WHERE zalo_id=? AND original_url=? AND short_code IS NOT NULL "
+        "ORDER BY created_at DESC LIMIT 1",
+        [zalo_id, original_url],
+    )
+    if existing["rows"] and existing["rows"][0]["short_code"]:
+        await turso.execute(
+            "INSERT INTO users (zalo_id, display_name) VALUES (?, ?) "
+            "ON CONFLICT(zalo_id) DO UPDATE SET display_name=excluded.display_name",
+            [zalo_id, display_name],
+        )
+        return existing["rows"][0]["short_code"]
+
+    code = _gen_code()
+    stmts = [
+        ("INSERT INTO users (zalo_id, display_name) VALUES (?, ?) "
+         "ON CONFLICT(zalo_id) DO UPDATE SET display_name=excluded.display_name",
+         [zalo_id, display_name]),
+        ("INSERT INTO links (zalo_id, original_url, affiliate_url, short_code) VALUES (?, ?, ?, ?)",
+         [zalo_id, original_url, affiliate_url, code]),
         ("UPDATE users SET total_clicks = total_clicks + 1 WHERE zalo_id = ?",
          [zalo_id]),
-    ])
+    ]
+    await turso.execute_batch(stmts)
+    return code
+
+
+async def get_link_by_code(code: str) -> dict | None:
+    r = await turso.execute(
+        "SELECT affiliate_url FROM links WHERE short_code=?", [code]
+    )
+    if not r["rows"]:
+        return None
+    await turso.execute(
+        "UPDATE links SET click_count = click_count + 1 WHERE short_code=?", [code]
+    )
+    return r["rows"][0]
 
 
 async def get_user_stats(zalo_id: str) -> dict:
@@ -228,7 +282,7 @@ async def admin_links_list(
     results = await turso.execute_batch([
         (f"SELECT COUNT(*) c FROM links l {where}", params),
         (f"SELECT l.id, l.zalo_id, l.original_url, l.affiliate_url, l.created_at, "
-         f"l.commission_user, l.status, l.conversion_id, "
+         f"l.commission_user, l.status, l.conversion_id, l.short_code, l.click_count, "
          f"u.display_name FROM links l LEFT JOIN users u ON l.zalo_id=u.zalo_id "
          f"{where} ORDER BY l.created_at DESC LIMIT ? OFFSET ?",
          params + [per_page, (page - 1) * per_page]),

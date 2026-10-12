@@ -123,6 +123,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--on);-webkit-font-s
 .pager .pg{min-width:34px;height:34px;border-radius:var(--r-pill);display:inline-flex;align-items:center;justify-content:center;font-weight:500;cursor:pointer;font-variant-numeric:tabular-nums;padding:0 6px}
 .pager .pg.on{background:var(--primary);color:#fff}
 .pager .pg.dis{color:var(--on-f);pointer-events:none}
+.ac-wrap{position:relative;flex:1}
+.ac-list{position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--outline);border-radius:var(--r-sm);box-shadow:var(--shadow-pop);max-height:200px;overflow-y:auto;z-index:20;display:none}
+.ac-list.show{display:block}
+.ac-item{padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:13.5px}
+.ac-item:hover,.ac-item.on{background:var(--surface-c)}
+.ac-item .ac-name{font-weight:500}
+.ac-item .ac-id{color:var(--on-f);font-size:12px;font-variant-numeric:tabular-nums}
 
 /* Crumb */
 .crumb{font-size:13.5px;font-weight:500;color:var(--on-v);cursor:pointer;margin-bottom:8px;display:inline-flex;align-items:center;gap:4px}
@@ -450,9 +457,10 @@ async function renderLinks() {
     <td class="num muted">${fmtDate(l.created_at)}</td>
     <td><div class="cell-user"><div class="bubble sm">${initials(l.display_name)}</div><div><div class="t1" style="font-size:13.5px">${esc(l.display_name||shortId(l.zalo_id))}</div></div></div></td>
     <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis" title="${esc(l.original_url)}">${esc(l.original_url)}</td>
+    <td class="num" style="font-weight:600">${l.click_count||0}</td>
     <td style="color:${stColor};font-size:13px"><span class="chip" style="font-size:12px">${stLabel}</span></td>
     <td style="font-weight:600;color:var(--income)">${comm > 0 ? fmtVnd(comm) : '—'}</td>
-    <td>${st === 'pending' ? `<button class="btn btn-sm btn-primary" onclick="setCommission(${l.id},'${esc(l.display_name||shortId(l.zalo_id))}')" style="font-size:12px;padding:4px 8px">${svg('check')} HH</button>` : ''}</td>
+    <td>${st === 'pending' ? `<button class="btn btn-sm btn-primary" onclick="setCommission(${l.id},'${esc(l.display_name||shortId(l.zalo_id))}')" style="font-size:12px;padding:4px 8px">${svg('check')}</button>` : ''}</td>
   </tr>`;
   }).join('');
 
@@ -465,9 +473,9 @@ async function renderLinks() {
       ${linksSearch||linksUser?`<button class="btn btn-sm btn-secondary" onclick="linksSearch='';linksUser='';linksPage=1;renderLinks()">Xóa bộ lọc</button>`:''}
     </div>
     <div class="card flush">
-      <table class="tbl"><colgroup><col style="width:140px"><col style="width:180px"><col><col style="width:110px"><col style="width:90px"><col style="width:70px"></colgroup>
-      <thead><tr><th>Thời gian</th><th>Người dùng</th><th>URL gốc</th><th>Trạng thái</th><th>Hoa hồng</th><th></th></tr></thead>
-      <tbody>${rows||'<tr><td colspan="6"><div class="empty"><div class="title-l">Không có link nào</div></div></td></tr>'}</tbody></table>
+      <table class="tbl"><colgroup><col style="width:130px"><col style="width:160px"><col><col style="width:55px"><col style="width:100px"><col style="width:90px"><col style="width:60px"></colgroup>
+      <thead><tr><th>Thời gian</th><th>Người dùng</th><th>URL gốc</th><th>Click</th><th>Trạng thái</th><th>Hoa hồng</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="7"><div class="empty"><div class="title-l">Không có link nào</div></div></td></tr>'}</tbody></table>
       ${data.pages>1 ? renderPager(data.page, data.pages, p=>{linksPage=p;renderLinks()}) : ''}
     </div>`;
 }
@@ -483,7 +491,7 @@ function setCommission(linkId, userName) {
       <div class="modal-body">
         <div style="font-size:14px;color:var(--on-v);margin-bottom:16px">
           <div style="font-weight:600;color:var(--on);margin-bottom:4px">${esc(userName)}</div>
-          Nhập số tiền user nhận (30% tổng HH Shopee)
+          Nhập số tiền user nhận (30% tổng hoa hồng Shopee)
           <div style="margin-top:6px;padding:8px 12px;background:var(--surface-c);border-radius:8px;font-size:13px">
             📋 VD: Shopee trả 10.000đ → user nhận <b>3.000đ</b>
           </div>
@@ -579,16 +587,23 @@ async function renderWithdrawals() {
 
 async function processWithdraw(id, action) {
   const note = action==='reject' ? (prompt('Lý do từ chối:')||'') : '';
-  const res = await fetch(`/api/admin/withdrawals/${id}/process`, {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({action, note}),
-  });
-  const data = await res.json();
-  if (data.ok) {
-    toast(action==='approve'?'Đã duyệt':'Đã từ chối', `Yêu cầu #${id} đã được xử lý`);
-    renderWithdrawals();
-  } else {
-    toast('Lỗi', data.error||'Không thể xử lý');
+  const btns = document.querySelectorAll(`[onclick*="processWithdraw(${id}"]`);
+  btns.forEach(b => { b.disabled = true; b.style.opacity = '.5'; });
+  try {
+    const res = await fetch(`/api/admin/withdrawals/${id}/process`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({action, note}),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      toast(action==='approve'?'Đã duyệt':'Đã từ chối', `Yêu cầu #${id} đã được xử lý`);
+      renderWithdrawals();
+    } else {
+      toast('Lỗi', data.error||'Không thể xử lý');
+      btns.forEach(b => { b.disabled = false; b.style.opacity = ''; });
+    }
+  } catch(e) {
+    btns.forEach(b => { b.disabled = false; b.style.opacity = ''; });
   }
 }
 
@@ -620,7 +635,10 @@ async function renderMessages() {
         <div style="margin-top:12px">
           <textarea id="notif-msg" rows="3" placeholder="Nhập tin nhắn gửi cho user..." style="width:100%;border:1px solid var(--outline);border-radius:var(--r-sm);padding:10px;font:14px var(--font);resize:vertical"></textarea>
           <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-            <input id="notif-zalo" placeholder="Zalo ID (để trống = gửi tất cả)" style="flex:1;height:40px;border:1px solid var(--outline);border-radius:var(--r-sm);padding:0 12px;font:14px var(--font)">
+            <div class="ac-wrap">
+              <input id="notif-zalo" placeholder="Tìm user hoặc để trống = gửi tất cả" autocomplete="off" style="width:100%;height:40px;border:1px solid var(--outline);border-radius:var(--r-sm);padding:0 12px;font:14px var(--font)" oninput="_acSearch(this.value)" onfocus="_acSearch(this.value)" onblur="setTimeout(()=>_acHide(),150)">
+              <div id="ac-dropdown" class="ac-list"></div>
+            </div>
             <button class="btn btn-primary" onclick="sendNotification()">Gửi</button>
           </div>
         </div>
@@ -652,22 +670,55 @@ async function renderMessages() {
     </div>`;
 }
 
+let _acTimer=null;
+function _acSearch(q) {
+  clearTimeout(_acTimer);
+  if (!q.trim()) { _acHide(); return; }
+  _acTimer = setTimeout(async () => {
+    try {
+      const data = await fetch(`/api/admin/users?search=${encodeURIComponent(q)}&per_page=6&page=1`).then(r=>r.json());
+      const dd = document.getElementById('ac-dropdown');
+      if (!data.items || !data.items.length) { dd.innerHTML='<div class="ac-item" style="color:var(--on-f)">Không tìm thấy</div>'; dd.classList.add('show'); return; }
+      dd.innerHTML = data.items.map(u =>
+        `<div class="ac-item" onclick="_acPick('${u.zalo_id}','${esc(u.display_name||"")}')">
+          <div class="bubble sm">${initials(u.display_name)}</div>
+          <div><div class="ac-name">${esc(u.display_name||'Ẩn danh')}</div><div class="ac-id">${u.zalo_id}</div></div>
+        </div>`
+      ).join('');
+      dd.classList.add('show');
+    } catch(e) {}
+  }, 250);
+}
+function _acPick(zaloId, name) {
+  const input = document.getElementById('notif-zalo');
+  input.value = zaloId;
+  input.dataset.name = name;
+  _acHide();
+}
+function _acHide() { document.getElementById('ac-dropdown')?.classList.remove('show'); }
+
 async function sendNotification() {
+  const btn = document.querySelector('#notif-msg').closest('div').parentElement.querySelector('.btn-primary');
   const msg = document.getElementById('notif-msg').value.trim();
   const zaloId = document.getElementById('notif-zalo').value.trim();
   if (!msg) { toast('Lỗi','Nhập nội dung tin nhắn'); return; }
-  const res = await fetch('/api/admin/notifications/send', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({message: msg, zalo_id: zaloId}),
-  });
-  const data = await res.json();
-  if (data.ok) {
-    toast('Đã gửi', `Gửi thành công tới ${data.sent} người`);
-    document.getElementById('notif-msg').value = '';
-    document.getElementById('notif-zalo').value = '';
-    renderMessages();
-  } else {
-    toast('Lỗi', data.error||'Không thể gửi');
+  btn.disabled = true; btn.textContent = 'Đang gửi…';
+  try {
+    const res = await fetch('/api/admin/notifications/send', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({message: msg, zalo_id: zaloId}),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      toast('Đã gửi', `Gửi thành công tới ${data.sent} người`);
+      document.getElementById('notif-msg').value = '';
+      document.getElementById('notif-zalo').value = '';
+      renderMessages();
+    } else {
+      toast('Lỗi', data.error||'Không thể gửi');
+    }
+  } finally {
+    btn.disabled = false; btn.textContent = 'Gửi';
   }
 }
 

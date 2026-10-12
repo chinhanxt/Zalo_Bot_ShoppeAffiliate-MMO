@@ -17,7 +17,7 @@ import uvicorn
 
 import config
 from db import (
-    init_db, upsert_user, log_link, get_user_stats,
+    init_db, upsert_user, log_link, get_link_by_code, get_user_stats,
     admin_dashboard_stats, admin_daily_stats, admin_users_list,
     admin_user_detail, admin_links_list, admin_recent_activity, admin_overview_batch,
     get_wallet, create_withdrawal,
@@ -30,7 +30,7 @@ from db import (
 )
 from linkgen import extract_shopee_urls, build_affiliate_link
 from url_resolver import is_short_url, resolve_redirect
-from zalo_api import send_text
+from zalo_api import send_text, send_photo
 from ai_chat import ask_gemini, test_gemini_key
 from utils import fmt_vnd
 from shopee_scraper import (
@@ -201,31 +201,30 @@ async def webhook_verify(request: Request):
 
 @app.post("/webhook")
 async def webhook_handler(request: Request):
-    if config.ZALO_WEBHOOK_SECRET:
-        secret = request.headers.get("x-bot-api-secret-token", "")
-        if secret != config.ZALO_WEBHOOK_SECRET:
-            logger.warning("Invalid webhook secret")
-            return Response(
-                content=json.dumps({"message": "Unauthorized"}),
-                status_code=403,
-                media_type="application/json",
-            )
-
     try:
         body = await request.json()
     except Exception:
         return {"message": "invalid json"}
 
-    logger.info("Webhook raw body: %s", json.dumps(body, ensure_ascii=False)[:1000])
-
     result = body.get("result", body)
     event_name = result.get("event_name", body.get("event_name", ""))
-    logger.info("Webhook event: %s", event_name)
 
-    if event_name == "message.text.received":
+    if event_name == "message.unsupported.received":
+        msg = result.get("message", {})
+        chat_id = msg.get("chat", {}).get("id", "")
+        if chat_id:
+            try:
+                guide_url = f"https://{config.BOT_DOMAIN}/static/guide-paste-link.png"
+                await send_photo(
+                    config.ZALO_BOT_TOKEN, chat_id, guide_url,
+                    caption="📋 Mình không đọc được link dạng này.\n\n"
+                            "👉 Dán link xong, bấm X để xóa card sản phẩm rồi gửi nhé!"
+                )
+            except Exception as e:
+                logger.error("unsupported reply failed: %s", e)
+    elif event_name.startswith("message.") and event_name.endswith(".received"):
         await handle_user_message(result)
     elif not event_name and result.get("message"):
-        logger.info("Fallback: treating as text message")
         await handle_user_message(result)
 
     return {"message": "Success"}
@@ -277,12 +276,102 @@ async def handle_user_message(result: dict):
     display_name = sender.get("display_name", "")
     text = (msg.get("text") or "").strip()
 
+    if not text:
+        links = msg.get("links", [])
+        if isinstance(links, list):
+            for lk in links:
+                u = lk.get("url", "") if isinstance(lk, dict) else ""
+                if u:
+                    text = u
+                    break
+        if not text:
+            text = (msg.get("url") or "").strip()
+        if not text:
+            for att in msg.get("attachments", []):
+                if isinstance(att, dict):
+                    payload = att.get("payload", {})
+                    u = payload.get("url", "") if isinstance(payload, dict) else ""
+                    if u:
+                        text = u
+                        break
+
     if not chat_id or not text:
         return
 
     tracking_id = user_id or chat_id
-    await upsert_user(tracking_id, display_name)
     cmd = text.lower().strip()
+
+    if cmd in ("5", "help", "menu", "huong dan", "hướng dẫn", "huong dan", "start", "hi", "xin chao", "xin chào"):
+        await send_text(
+            config.ZALO_BOT_TOKEN, chat_id,
+            f"Chào {display_name or 'bạn'}! 👋\n\n"
+            f"📝 Lệnh nhanh (bấm số hoặc gõ tên):\n"
+            f"1 · Ví — xem số dư 👛\n"
+            f"2 · Cài đặt — lưu STK 🏦\n"
+            f"3 · Rút tiền — rút về TK 💸\n"
+            f"4 · Thống kê — xem lịch sử 📊\n"
+            f"5 · Hướng dẫn 📖\n"
+            f"6 · Tính nhận tiền — VD: 6 200k 🧮\n"
+            f"🔗 Gửi link Shopee → nhận link nhận tiền\n\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"🛒 Cách nhận tiền:\n"
+            f"Gửi link Shopee → mua qua link nhận tiền → đơn thành công → Shopee xác nhận (~7-30 ngày) → tiền vào ví → rút về ngân hàng!\n\n"
+            f"💰 Nhận ~1.5% giá trị đơn\n"
+            f"📋 VD: đơn 200.000đ → nhận ~3.000đ"
+        )
+        return
+
+    tinh_match = _re.match(r'^(?:6|tinh|tính|tính tiền|tinhtien)\s+(.+)$', cmd)
+    if tinh_match:
+        amount = _parse_vnd(tinh_match.group(1))
+        if amount and amount >= 1000:
+            cashback = round(amount * CASHBACK_RATE)
+            await send_text(
+                config.ZALO_BOT_TOKEN, chat_id,
+                f"🧮 Ước tính nhận tiền\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"🛒 Giá đơn: {_fmt_vnd(amount)}\n"
+                f"💰 Nhận ~{_fmt_vnd(cashback)}\n\n"
+                f"📌 Đây là ước tính (~1.5%), thực tế tuỳ ngành hàng có thể cao hơn!\n"
+                f"Gửi link Shopee để nhận link nhận tiền nha 🛒"
+            )
+        else:
+            await send_text(
+                config.ZALO_BOT_TOKEN, chat_id,
+                f"🤔 Mình không hiểu số tiền. Thử lại nhé!\n"
+                f"VD: 6 200k · 6 1tr5 · 6 500.000"
+            )
+        return
+
+    if cmd in ("6", "tinh", "tính", "tính tiền", "tinhtien"):
+        await send_text(
+            config.ZALO_BOT_TOKEN, chat_id,
+            f"🧮 Tính nhận tiền\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"Nhập giá đơn hàng để tính:\n\n"
+            f"VD:\n"
+            f"• 6 200k → nhận ~{_fmt_vnd(round(200000 * CASHBACK_RATE))}\n"
+            f"• 6 1tr5 → nhận ~{_fmt_vnd(round(1500000 * CASHBACK_RATE))}\n"
+            f"• 6 500.000 → nhận ~{_fmt_vnd(round(500000 * CASHBACK_RATE))}\n\n"
+            f"💡 Gõ: 6 [giá đơn]"
+        )
+        return
+
+    bare_amount = _parse_vnd(text)
+    if bare_amount and bare_amount >= 1000:
+        cashback = round(bare_amount * CASHBACK_RATE)
+        await send_text(
+            config.ZALO_BOT_TOKEN, chat_id,
+            f"🧮 Ước tính nhận tiền\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"🛒 Giá đơn: {_fmt_vnd(bare_amount)}\n"
+            f"💰 Nhận ~{_fmt_vnd(cashback)}\n\n"
+            f"📌 Đây là ước tính (~1.5%), thực tế tuỳ ngành hàng có thể cao hơn!\n"
+            f"Gửi link Shopee để nhận link nhận tiền nha 🛒"
+        )
+        return
+
+    await upsert_user(tracking_id, display_name)
 
     if cmd in ("1", "vi", "ví", "wallet", "sodu", "số dư", "so du"):
         w = await get_wallet(tracking_id)
@@ -451,76 +540,6 @@ async def handle_user_message(result: dict):
         await send_text(config.ZALO_BOT_TOKEN, chat_id, reply)
         return
 
-    if cmd in ("5", "help", "menu", "huong dan", "hướng dẫn", "huong dan", "start", "hi", "xin chao", "xin chào"):
-        await send_text(
-            config.ZALO_BOT_TOKEN, chat_id,
-            f"Chào {display_name or 'bạn'}! 👋\n\n"
-            f"📝 Lệnh nhanh (bấm số hoặc gõ tên):\n"
-            f"1 · Ví — xem số dư 👛\n"
-            f"2 · Cài đặt — lưu STK 🏦\n"
-            f"3 · Rút tiền — rút về TK 💸\n"
-            f"4 · Thống kê — xem lịch sử 📊\n"
-            f"5 · Hướng dẫn 📖\n"
-            f"6 · Tính nhận tiền — VD: 6 200k 🧮\n"
-            f"🔗 Gửi link Shopee → nhận link nhận tiền\n\n"
-            f"━━━━━━━━━━━━━━━\n"
-            f"🛒 Cách nhận nhận tiền:\n"
-            f"Gửi link Shopee → mua qua link nhận tiền → đơn thành công → Shopee xác nhận (~7-30 ngày) → tiền vào ví → rút về ngân hàng!\n\n"
-            f"💰 Nhận ~1.5% giá trị đơn\n"
-            f"📋 VD: đơn 200.000đ → nhận ~3.000đ"
-        )
-        return
-
-    tinh_match = _re.match(r'^(?:6|tinh|tính|tính tiền|tinhtien)\s+(.+)$', cmd)
-    if tinh_match:
-        amount = _parse_vnd(tinh_match.group(1))
-        if amount and amount >= 1000:
-            cashback = round(amount * CASHBACK_RATE)
-            await send_text(
-                config.ZALO_BOT_TOKEN, chat_id,
-                f"🧮 Ước tính nhận tiền\n"
-                f"━━━━━━━━━━━━━━━\n"
-                f"🛒 Giá đơn: {_fmt_vnd(amount)}\n"
-                f"💰 Nhận ~{_fmt_vnd(cashback)}\n\n"
-                f"📌 Đây là ước tính (~1.5%), thực tế tuỳ ngành hàng có thể cao hơn!\n"
-                f"Gửi link Shopee để nhận link nhận tiền nha 🛒"
-            )
-        else:
-            await send_text(
-                config.ZALO_BOT_TOKEN, chat_id,
-                f"🤔 Mình không hiểu số tiền. Thử lại nhé!\n"
-                f"VD: 6 200k · 6 1tr5 · 6 500.000"
-            )
-        return
-
-    if cmd in ("6", "tinh", "tính", "tính tiền", "tinhtien"):
-        await send_text(
-            config.ZALO_BOT_TOKEN, chat_id,
-            f"🧮 Tính nhận tiền\n"
-            f"━━━━━━━━━━━━━━━\n"
-            f"Nhập giá đơn hàng để tính:\n\n"
-            f"VD:\n"
-            f"• 6 200k → nhận ~{_fmt_vnd(round(200000 * CASHBACK_RATE))}\n"
-            f"• 6 1tr5 → nhận ~{_fmt_vnd(round(1500000 * CASHBACK_RATE))}\n"
-            f"• 6 500.000 → nhận ~{_fmt_vnd(round(500000 * CASHBACK_RATE))}\n\n"
-            f"💡 Gõ: 6 [giá đơn]"
-        )
-        return
-
-    bare_amount = _parse_vnd(text)
-    if bare_amount and bare_amount >= 1000:
-        cashback = round(bare_amount * CASHBACK_RATE)
-        await send_text(
-            config.ZALO_BOT_TOKEN, chat_id,
-            f"🧮 Ước tính nhận tiền\n"
-            f"━━━━━━━━━━━━━━━\n"
-            f"🛒 Giá đơn: {_fmt_vnd(bare_amount)}\n"
-            f"💰 Nhận ~{_fmt_vnd(cashback)}\n\n"
-            f"📌 Đây là ước tính (~1.5%), thực tế tuỳ ngành hàng có thể cao hơn!\n"
-            f"Gửi link Shopee để nhận link nhận tiền nha 🛒"
-        )
-        return
-
     if not config.AFFILIATE_ID:
         await send_text(config.ZALO_BOT_TOKEN, chat_id,
             "😅 Bot đang bảo trì, bạn quay lại sau nhé!")
@@ -568,8 +587,9 @@ async def handle_user_message(result: dict):
             sub_ids=[tracking_id],
         )
 
-        await log_link(tracking_id, full_url, aff_link)
-        results.append(aff_link)
+        code = await log_link(tracking_id, full_url, aff_link, display_name)
+        short_url = f"https://{config.BOT_DOMAIN}/s/{code}"
+        results.append(short_url)
 
     if len(results) == 1:
         reply = (
@@ -590,6 +610,26 @@ async def handle_user_message(result: dict):
         )
 
     await send_text(config.ZALO_BOT_TOKEN, chat_id, reply)
+
+
+# ──────────────────────────────────────────────
+# Short link redirect
+# ──────────────────────────────────────────────
+
+@app.get("/static/{filename}")
+async def public_static(filename: str):
+    fp = os.path.join(ADMIN_DIR, filename)
+    if os.path.isfile(fp) and filename.endswith((".png", ".jpg", ".jpeg", ".webp")):
+        return FileResponse(fp)
+    return Response(status_code=404)
+
+
+@app.get("/s/{code}")
+async def short_redirect(code: str):
+    link = await get_link_by_code(code)
+    if not link:
+        return HTMLResponse("<h3>Link không tồn tại hoặc đã hết hạn</h3>", status_code=404)
+    return RedirectResponse(link["affiliate_url"], status_code=302)
 
 
 # ──────────────────────────────────────────────
