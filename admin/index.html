@@ -809,8 +809,8 @@ function cfgToggleSave() {
   _cfgPreview();
 }
 
-function _estRange(amount, share, lo, hi) {
-  const r = pct => Math.round(amount * pct / 100 * share / 100 / 100) * 100;
+function _estRange(amount, share, lo, hi, cap) {
+  const r = pct => Math.round(Math.min(amount * pct / 100, cap || Infinity) * share / 100 / 100) * 100;
   const a = r(lo), b = Math.max(a, r(hi));
   return b > a ? `${fmtVnd(a)} – ${fmtVnd(b)}` : fmtVnd(a);
 }
@@ -819,10 +819,12 @@ function _cfgPreview() {
   const el = document.getElementById('cfg-rate-preview');
   if (!el) return;
   const v = id => parseFloat(document.getElementById(id).value) || 0;
-  const s = v('cfg-share'), lo = v('cfg-cmin'), hi = v('cfg-cmax');
-  el.innerHTML = `💰 Đơn 200.000đ → nhận khoảng <b>${_estRange(200000, s, lo, hi)}</b><br>`
-    + `💰 Đơn 1.000.000đ → nhận khoảng <b>${_estRange(1000000, s, lo, hi)}</b><br>`
-    + `<span class="muted" style="font-size:13px">Chia: user ${s}% · admin ${Math.max(0, 100 - s)}% hoa hồng</span>`;
+  const s = v('cfg-share'), lo = v('cfg-cmin'), hi = v('cfg-cmax'), cap = v('cfg-cap');
+  const shopee = Math.min(100000 * hi / 100, cap || Infinity);
+  const rows = [100000, 200000, 1000000, 3000000].map(a =>
+    `💰 Đơn ${fmtVnd(a)} → nhận khoảng <b>${_estRange(a, s, lo, hi, cap)}</b>`).join('<br>');
+  el.innerHTML = rows
+    + `<div class="muted" style="font-size:13px;margin-top:6px">VD đơn 100.000đ, Shopee trả ${fmtVnd(shopee)} → user ${fmtVnd(Math.round(shopee * s / 100))} · bạn ${fmtVnd(Math.round(shopee * (100 - s) / 100))}</div>`;
 }
 
 async function saveConfig() {
@@ -838,6 +840,7 @@ async function saveConfig() {
     USER_SHARE_PCT: document.getElementById('cfg-share').value,
     COMMISSION_MIN_PCT: document.getElementById('cfg-cmin').value,
     COMMISSION_MAX_PCT: document.getElementById('cfg-cmax').value,
+    COMMISSION_CAP_VND: document.getElementById('cfg-cap').value,
   };
   try {
     const res = await fetch('/api/admin/config', {
@@ -1045,9 +1048,11 @@ async function renderConfig() {
         <div class="srow"><div><div class="sl">% user nhận</div><div class="sd">Phần hoa hồng Shopee chia cho user, admin giữ phần còn lại. Áp dụng cho đồng bộ tự động.</div></div>
           <div class="sc">${cfgInput('cfg-share', cfg.user_share_pct ?? 30, {type:'number'})}<div class="help">VD: 30 = user 30% / admin 70%</div></div></div>
         <div class="srow"><div><div class="sl">Hoa hồng Shopee thấp nhất (%)</div><div class="sd">Dùng để tạm tính lệnh 6 và tin trả link cho user.</div></div>
-          <div class="sc">${cfgInput('cfg-cmin', cfg.commission_min_pct ?? 5, {type:'number'})}<div class="help">Mức hoa hồng phổ biến Shopee trả cho bạn</div></div></div>
+          <div class="sc">${cfgInput('cfg-cmin', cfg.commission_min_pct ?? 2, {type:'number'})}<div class="help">Shopee VN: điện tử/mẹ bé ~1.6% · thời trang/làm đẹp ~3.7%</div></div></div>
         <div class="srow"><div><div class="sl">Hoa hồng Shopee cao nhất (%)</div><div class="sd">Lớn hơn mức thấp nhất → user thấy một khoảng tiền. Bằng nhau → thấy 1 con số.</div></div>
-          <div class="sc">${cfgInput('cfg-cmax', cfg.commission_max_pct ?? 10, {type:'number'})}<div class="help">User chỉ thấy số tiền, không thấy %</div></div></div>
+          <div class="sc">${cfgInput('cfg-cmax', cfg.commission_max_pct ?? 4, {type:'number'})}<div class="help">User chỉ thấy số tiền, không thấy %</div></div></div>
+        <div class="srow"><div><div class="sl">Trần hoa hồng / đơn (VNĐ)</div><div class="sd">Shopee trả tối đa bao nhiêu cho 1 đơn. Đơn lớn sẽ không tính vượt mức này.</div></div>
+          <div class="sc">${cfgInput('cfg-cap', cfg.commission_cap_vnd ?? 30000, {type:'number'})}<div class="help">Hiện Shopee VN: 30.000đ/đơn. 0 = không giới hạn</div></div></div>
         <div class="srow"><div><div class="sl">Xem trước</div><div class="sd">Tin bot gửi cho user.</div></div>
           <div class="sc"><div id="cfg-rate-preview" style="padding:10px 14px;background:var(--surface-c);border-radius:10px;font-size:14px;line-height:1.6"></div></div></div>
       </div>

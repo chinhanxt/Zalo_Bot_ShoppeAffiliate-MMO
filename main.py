@@ -58,7 +58,7 @@ def _hash_pw(pw: str) -> str:
 
 _cfg_loaded_at = 0.0
 STR_CFG_KEYS = ["AFFILIATE_ID", "ZALO_BOT_TOKEN", "ZALO_WEBHOOK_SECRET", "GEMINI_API_KEY"]
-RATE_CFG_KEYS = ["USER_SHARE_PCT", "COMMISSION_MIN_PCT", "COMMISSION_MAX_PCT"]
+RATE_CFG_KEYS = ["USER_SHARE_PCT", "COMMISSION_MIN_PCT", "COMMISSION_MAX_PCT", "COMMISSION_CAP_VND"]
 
 
 async def _ensure_db():
@@ -92,9 +92,13 @@ async def _load_config_overrides():
 
 def _est_range(amount: float) -> tuple[int, int]:
     share = config.USER_SHARE_PCT / 100
-    lo = int(round(amount * config.COMMISSION_MIN_PCT / 100 * share / 100) * 100)
-    hi = int(round(amount * config.COMMISSION_MAX_PCT / 100 * share / 100) * 100)
-    return lo, max(lo, hi)
+    cap = config.COMMISSION_CAP_VND or float("inf")
+
+    def user_part(pct: float) -> int:
+        return int(round(min(amount * pct / 100, cap) * share / 100) * 100)
+
+    lo = user_part(config.COMMISSION_MIN_PCT)
+    return lo, max(lo, user_part(config.COMMISSION_MAX_PCT))
 
 
 def _fmt_est(amount: float) -> str:
@@ -914,6 +918,7 @@ async def api_admin_config():
         "user_share_pct": config.USER_SHARE_PCT,
         "commission_min_pct": config.COMMISSION_MIN_PCT,
         "commission_max_pct": config.COMMISSION_MAX_PCT,
+        "commission_cap_vnd": config.COMMISSION_CAP_VND,
         "host": config.HOST,
         "port": config.PORT,
     }
@@ -942,6 +947,8 @@ async def api_admin_config_update(request: Request):
         return {"ok": False, "error": "% hoa hồng Shopee phải trong khoảng 0–100"}
     if cmax < cmin:
         return {"ok": False, "error": "Hoa hồng cao nhất phải ≥ thấp nhất"}
+    if rates.get("COMMISSION_CAP_VND", 0) < 0:
+        return {"ok": False, "error": "Trần hoa hồng không được âm (0 = không giới hạn)"}
     for key, val in rates.items():
         setattr(config, key, val)
         await kv_set(f"config_{key}", str(val))
