@@ -32,6 +32,26 @@ def _shorten_shopee_url(url: str) -> str:
     return url
 
 
+_PRODUCT_PATH_RE = re.compile(r"^/(?:product/\d+/\d+|opaanlp/\d+/\d+|[^/]*-i\.\d+\.\d+)/?$")
+_VOLATILE_PARAMS = {
+    "credential_token", "__mobile__", "smtt", "xptdk", "gads_t_sig", "uls_trackid", "mmp_pid",
+    "sp_atk", "is_from_login", "deep_and_deferred", "share_channel_code", "fbclid", "gclid",
+}
+
+
+def clean_shopee_url(url: str) -> str:
+    """Bỏ tham số tracking thay đổi mỗi lần resolve để link ổn định (dedup được)."""
+    from urllib.parse import urlunparse
+    if not url.startswith("http"):
+        url = "https://" + url
+    u = urlparse(url)
+    if _PRODUCT_PATH_RE.match(u.path):
+        return urlunparse((u.scheme, u.netloc, u.path, "", "", ""))
+    q = [(k, v) for k, vs in parse_qs(u.query, keep_blank_values=True).items() for v in vs
+         if k not in _VOLATILE_PARAMS and not k.startswith("utm_")]
+    return urlunparse((u.scheme, u.netloc, u.path, "", urlencode(q), ""))
+
+
 def build_affiliate_link(
     product_url: str,
     affiliate_id: str,

@@ -4,6 +4,7 @@ User gửi link Shopee → Bot trả link affiliate (an_redir).
 """
 
 import logging
+import re as _re
 import json
 import os
 import hashlib
@@ -28,7 +29,7 @@ from db import (
     scheduled_due, scheduled_mark_sent, all_user_chat_ids,
     kv_get, kv_set,
 )
-from linkgen import extract_shopee_urls, build_affiliate_link
+from linkgen import extract_shopee_urls, build_affiliate_link, clean_shopee_url
 from url_resolver import is_short_url, resolve_redirect
 from zalo_api import send_text, send_photo
 from ai_chat import ask_gemini, test_gemini_key
@@ -214,12 +215,7 @@ async def webhook_handler(request: Request):
         chat_id = msg.get("chat", {}).get("id", "")
         if chat_id:
             try:
-                guide_url = f"https://{config.BOT_DOMAIN}/static/guide-paste-link.png"
-                await send_photo(
-                    config.ZALO_BOT_TOKEN, chat_id, guide_url,
-                    caption="📋 Mình không đọc được link dạng này.\n\n"
-                            "👉 Dán link xong, bấm X để xóa card sản phẩm rồi gửi nhé!"
-                )
+                await _reply_unsupported(chat_id)
             except Exception as e:
                 logger.error("unsupported reply failed: %s", e)
     elif event_name.startswith("message.") and event_name.endswith(".received"):
@@ -230,11 +226,127 @@ async def webhook_handler(request: Request):
     return {"message": "Success"}
 
 
+UNSUPPORTED_TEXT = (
+    "📋 Mình chưa đọc được loại tin nhắn này (link kèm card sản phẩm, thẻ ngân hàng, ảnh, sticker...).\n\n"
+    "🔗 Gửi link Shopee: dán link → bấm X để xóa card → gửi.\n"
+    "🏦 Lưu STK: gõ chữ theo mẫu\n"
+    "caidat MBBank 0123456789 NGUYEN VAN A\n\n"
+    "Gõ \"help\" để xem các lệnh 😊"
+)
+
+
+async def _reply_unsupported(chat_id: str):
+    from datetime import date
+    key = f"guide_{date.today().isoformat()}_{chat_id}"
+    if not await kv_get(key):
+        await kv_set(key, "1")
+        res = await send_photo(
+            config.ZALO_BOT_TOKEN, chat_id,
+            f"https://{config.BOT_DOMAIN}/static/guide-paste-link.png",
+            caption=UNSUPPORTED_TEXT,
+        )
+        if res.get("ok"):
+            return
+    await send_text(config.ZALO_BOT_TOKEN, chat_id, UNSUPPORTED_TEXT)
+
+
+import unicodedata as _ud
+
+
+def _no_accent(s: str) -> str:
+    s = _ud.normalize("NFC", s).replace("đ", "d").replace("Đ", "D")
+    return "".join(c for c in _ud.normalize("NFD", s) if _ud.category(c) != "Mn")
+
+
+_BANK_PREFIXES = {
+    "caidat", "catdat", "caidt", "cadat", "caiat", "caidatt", "caiddat", "caidar", "caidta",
+    "stk", "sotk", "sotaikhoan", "bank", "nganhang", "taikhoan",
+}
+_KNOWN_BANKS = {
+    "vietcombank", "vcb", "techcombank", "tcb", "mb", "mbbank", "mbb", "bidv", "vietinbank", "ctg",
+    "agribank", "agr", "acb", "vpbank", "vpb", "tpbank", "tpb", "sacombank", "stb", "hdbank", "hdb",
+    "vib", "shb", "msb", "ocb", "seabank", "seab", "eximbank", "eib", "lienvietpostbank", "lpbank", "lpb",
+    "namabank", "nab", "bacabank", "bab", "pvcombank", "vietabank", "abbank", "kienlongbank", "klb",
+    "ncb", "saigonbank", "sgb", "baovietbank", "bvb", "scb", "gpbank", "oceanbank", "vietbank", "vbb",
+    "cake", "timo", "ubank", "tnex", "liobank", "momo", "zalopay", "viettelmoney", "vnpay",
+    "shinhan", "shinhanbank", "woori", "uob", "hsbc", "cimb", "publicbank", "indovina", "vrb", "vikki",
+}
+_ACC_TOKEN_RE = _re.compile(r"[\d.\-]+")
+
+
+def _is_known_bank(name: str) -> bool:
+    k = _no_accent(name).lower().replace(" ", "").replace("-", "")
+    return k in _KNOWN_BANKS or (k.endswith("bank") and k.isalpha() and len(k) > 4)
+
+
+def _parse_bank_info(text: str):
+    """None = không phải lệnh STK; "incomplete" = có ý lưu STK nhưng sai mẫu; dict = hợp lệ."""
+    tokens = text.split()
+    norm = [_no_accent(t).lower().strip(":,.-") for t in tokens]
+    skip = 0
+    if len(norm) >= 3 and "".join(norm[:3]) in _BANK_PREFIXES:
+        skip = 3
+    elif len(norm) >= 2 and "".join(norm[:2]) in _BANK_PREFIXES:
+        skip = 2
+    elif norm and norm[0] in _BANK_PREFIXES:
+        skip = 1
+    has_prefix = skip > 0
+    rest = tokens[skip:]
+
+    acc_start = acc_end = None
+    for i, t in enumerate(rest):
+        tt = t.strip(":,")
+        if not (_ACC_TOKEN_RE.fullmatch(tt) and any(c.isdigit() for c in tt)):
+            continue
+        j = i + 1
+        while j < len(rest) and _ACC_TOKEN_RE.fullmatch(rest[j].strip(":,")):
+            j += 1
+        if sum(c.isdigit() for c in "".join(rest[i:j])) >= 6:
+            acc_start, acc_end = i, j
+            break
+    if acc_start is None:
+        return "incomplete" if has_prefix else None
+
+    account = "".join(c for c in "".join(rest[acc_start:acc_end]) if c.isdigit())
+    bank_tokens = rest[:acc_start]
+    holder_tokens = rest[acc_end:]
+
+    if not bank_tokens and holder_tokens and _is_known_bank(holder_tokens[0]):
+        bank_tokens, holder_tokens = holder_tokens[:1], holder_tokens[1:]
+    elif bank_tokens and not _is_known_bank(" ".join(bank_tokens)) and holder_tokens and _is_known_bank(holder_tokens[0]):
+        bank_tokens, holder_tokens = holder_tokens[:1], holder_tokens[1:]
+
+    bank = " ".join(t.strip(":,") for t in bank_tokens).strip()
+    holder = " ".join(t.strip(":,") for t in holder_tokens).strip()
+
+    bank_ok = bool(bank) and (_is_known_bank(bank) or (has_prefix and len(bank_tokens) == 1 and bank.replace("-", "").isalpha()))
+    holder_ok = bool(holder) and not any(c.isdigit() for c in holder) and any(c.isalpha() for c in holder)
+    acc_ok = 6 <= len(account) <= 20
+
+    if not (bank_ok and holder_ok and acc_ok):
+        mentions_bank = any(n in _BANK_PREFIXES or n in _KNOWN_BANKS or _is_known_bank(n) for n in norm)
+        if has_prefix or mentions_bank:
+            return "incomplete"
+        return None
+    return {"bank_name": bank, "bank_account": account, "bank_holder": _no_accent(holder).upper()}
+
+
+BANK_TEMPLATE = (
+    "🏦 Lưu tài khoản ngân hàng\n"
+    "━━━━━━━━━━━━━━━\n"
+    "Gửi đúng 1 dòng theo mẫu:\n"
+    "caidat [ngân hàng] [số TK] [tên chủ TK]\n\n"
+    "Ví dụ:\n"
+    "caidat MBBank 0123456789 NGUYEN VAN A\n"
+    "caidat Vietcombank 1234567890 TRAN THI B\n\n"
+    "⚠️ Gõ bằng chữ, không gửi thẻ/ảnh ngân hàng nhé!"
+)
+
+
 def _fmt_vnd(amount: float) -> str:
     return fmt_vnd(amount)
 
 
-import re as _re
 
 def _parse_vnd(text: str) -> float | None:
     s = text.lower().strip()
@@ -357,8 +469,10 @@ async def handle_user_message(result: dict):
         )
         return
 
-    bare_amount = _parse_vnd(text)
-    if bare_amount and bare_amount >= 1000:
+    digits_only = text.replace(" ", "").replace(".", "")
+    looks_like_account = digits_only.isdigit() and digits_only.startswith("0") and len(digits_only) >= 9
+    bare_amount = None if looks_like_account else _parse_vnd(text)
+    if bare_amount and 1000 <= bare_amount <= 1_000_000_000:
         cashback = round(bare_amount * CASHBACK_RATE)
         await send_text(
             config.ZALO_BOT_TOKEN, chat_id,
@@ -391,7 +505,9 @@ async def handle_user_message(result: dict):
         await send_text(config.ZALO_BOT_TOKEN, chat_id, reply)
         return
 
-    if cmd in ("2", "caidat", "cài đặt", "cai dat", "setting", "stk", "ngân hàng", "ngan hang"):
+    ncmd = _no_accent(cmd)
+    if ncmd.replace(" ", "") in ("2", "caidat", "catdat", "caidt", "cadat", "setting", "stk", "sotk",
+                                 "nganhang", "taikhoan", "bank"):
         bank = await get_bank_info(tracking_id)
         if bank["bank_name"]:
             reply = (
@@ -418,21 +534,27 @@ async def handle_user_message(result: dict):
         await send_text(config.ZALO_BOT_TOKEN, chat_id, reply)
         return
 
-    if cmd.startswith("caidat ") and len(cmd.split()) >= 4:
-        parts = text.split(None, 3)
-        bank_name = parts[1]
-        bank_account = parts[2]
-        bank_holder = parts[3] if len(parts) > 3 else ""
-        await update_bank_info(tracking_id, bank_name, bank_account, bank_holder)
+    bank_parsed = _parse_bank_info(text)
+    if bank_parsed == "incomplete":
+        await send_text(config.ZALO_BOT_TOKEN, chat_id, BANK_TEMPLATE)
+        return
+    if bank_parsed:
+        await update_bank_info(tracking_id, bank_parsed["bank_name"],
+                               bank_parsed["bank_account"], bank_parsed["bank_holder"])
+        saved = await get_bank_info(tracking_id)
+        if saved.get("bank_account") != bank_parsed["bank_account"]:
+            logger.error("bank save mismatch for %s: %s", tracking_id, saved)
+            await send_text(config.ZALO_BOT_TOKEN, chat_id,
+                "😢 Lưu STK chưa thành công, bạn gửi lại giúp mình nhé!\n\n" + BANK_TEMPLATE)
+            return
         await send_text(
             config.ZALO_BOT_TOKEN, chat_id,
             f"✅ Đã lưu thông tin ngân hàng!\n\n"
-            f"🏧 Ngân hàng: {bank_name}\n"
-            f"💳 Số TK: {bank_account}\n"
-            f"👤 Chủ TK: {bank_holder}\n\n"
-            f"Giờ khi rút tiền, bạn chỉ cần gõ:\n"
-            f"rut [số tiền]\n\n"
-            f"Ví dụ: rut 50000 🎉"
+            f"🏧 Ngân hàng: {saved['bank_name']}\n"
+            f"💳 Số TK: {saved['bank_account']}\n"
+            f"👤 Chủ TK: {saved['bank_holder']}\n\n"
+            f"Sai thông tin? Gửi lại lệnh caidat để sửa.\n"
+            f"Rút tiền: gõ rut [số tiền] — VD: rut 50000 🎉"
         )
         return
 
@@ -470,14 +592,23 @@ async def handle_user_message(result: dict):
         )
         return
 
-    if cmd.startswith("rut ") and len(cmd.split()) >= 2:
-        parts = text.split(None, 1)
-        try:
-            amount = float(parts[1].replace(",", "").replace(".", ""))
-        except ValueError:
+    if ncmd.startswith("rut ") and len(ncmd.split()) >= 2:
+        arg = ncmd.split(None, 1)[1].strip()
+        if arg.startswith("tien "):
+            arg = arg[5:].strip()
+        if arg in ("het", "tat ca", "all"):
+            amount = float((await get_wallet(tracking_id))["balance"])
+        else:
+            amount = _parse_vnd(arg)
+            if amount is None:
+                try:
+                    amount = float(arg.replace(",", "").replace(".", "").replace("d", "").strip())
+                except ValueError:
+                    amount = None
+        if amount is None:
             await send_text(config.ZALO_BOT_TOKEN, chat_id,
                 "🤔 Mình không hiểu số tiền. Thử lại nhé!\n"
-                "Ví dụ: rut 50000")
+                "Ví dụ: rut 50000 · rut 50k · rut het")
             return
 
         if amount < 20000:
@@ -580,6 +711,7 @@ async def handle_user_message(result: dict):
         full_url = url
         if is_short_url(url):
             full_url = await resolve_redirect(url)
+        full_url = clean_shopee_url(full_url)
 
         aff_link = build_affiliate_link(
             product_url=full_url,
