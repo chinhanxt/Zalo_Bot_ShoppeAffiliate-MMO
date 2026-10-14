@@ -84,6 +84,11 @@ async def kv_get(key: str) -> str | None:
     return None
 
 
+async def kv_get_prefix(prefix: str) -> dict:
+    r = await turso.execute("SELECT key, value FROM kv_store WHERE key LIKE ?", [prefix + "%"])
+    return {row["key"]: row["value"] for row in r["rows"]}
+
+
 async def kv_set(key: str, value: str):
     await turso.execute(
         "INSERT INTO kv_store (key, value, updated_at) VALUES (?, ?, datetime('now')) "

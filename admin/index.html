@@ -480,7 +480,9 @@ async function renderLinks() {
     </div>`;
 }
 
-function setCommission(linkId, userName) {
+async function setCommission(linkId, userName) {
+  let share = 30;
+  try { share = (await api('/api/admin/config')).user_share_pct ?? 30; } catch(e) {}
   const bg = document.createElement('div');
   bg.className = 'modal-bg';
   bg.onclick = e => { if (e.target === bg) bg.remove(); };
@@ -491,11 +493,14 @@ function setCommission(linkId, userName) {
       <div class="modal-body">
         <div style="font-size:14px;color:var(--on-v);margin-bottom:16px">
           <div style="font-weight:600;color:var(--on);margin-bottom:4px">${esc(userName)}</div>
-          Nhập số tiền user nhận (30% tổng hoa hồng Shopee)
+          Nhập số tiền user nhận (${share}% hoa hồng Shopee)
           <div style="margin-top:6px;padding:8px 12px;background:var(--surface-c);border-radius:8px;font-size:13px">
-            📋 VD: Shopee trả 10.000đ → user nhận <b>3.000đ</b>
+            📋 VD: Shopee trả 10.000đ → user nhận <b>${fmtVnd(Math.round(10000 * share / 100))}</b>
           </div>
         </div>
+        <div style="font-size:13px;font-weight:600;color:var(--on-v);margin-bottom:6px">Shopee trả (không bắt buộc — tự tính phần user)</div>
+        <input id="modal-shopee" class="inp" type="text" inputmode="numeric" placeholder="VD: 10000" style="margin-bottom:12px"
+          oninput="const v=parseFloat(this.value.replace(/[,.đ\s]/g,''));document.getElementById('modal-commission').value=isNaN(v)?'':Math.round(v*${share}/100)">
         <div style="font-size:13px;font-weight:600;color:var(--on-v);margin-bottom:6px">Số tiền (VNĐ)</div>
         <input id="modal-commission" class="inp" type="text" inputmode="numeric" placeholder="VD: 3000" autofocus
           onkeydown="if(event.key==='Enter')document.getElementById('modal-confirm').click()">
@@ -801,6 +806,23 @@ function cfgInput(id, value, opts={}) {
 function cfgToggleSave() {
   const btn = document.getElementById('cfg-save');
   if (btn) btn.disabled = !_cfgDirty;
+  _cfgPreview();
+}
+
+function _estRange(amount, share, lo, hi) {
+  const r = pct => Math.round(amount * pct / 100 * share / 100 / 100) * 100;
+  const a = r(lo), b = Math.max(a, r(hi));
+  return b > a ? `${fmtVnd(a)} – ${fmtVnd(b)}` : fmtVnd(a);
+}
+
+function _cfgPreview() {
+  const el = document.getElementById('cfg-rate-preview');
+  if (!el) return;
+  const v = id => parseFloat(document.getElementById(id).value) || 0;
+  const s = v('cfg-share'), lo = v('cfg-cmin'), hi = v('cfg-cmax');
+  el.innerHTML = `💰 Đơn 200.000đ → nhận khoảng <b>${_estRange(200000, s, lo, hi)}</b><br>`
+    + `💰 Đơn 1.000.000đ → nhận khoảng <b>${_estRange(1000000, s, lo, hi)}</b><br>`
+    + `<span class="muted" style="font-size:13px">Chia: user ${s}% · admin ${Math.max(0, 100 - s)}% hoa hồng</span>`;
 }
 
 async function saveConfig() {
@@ -813,6 +835,9 @@ async function saveConfig() {
     ZALO_WEBHOOK_SECRET: document.getElementById('cfg-zalo-secret').value.trim(),
     GEMINI_API_KEY: document.getElementById('cfg-gemini-key').value.trim(),
     AI_USER_LIMIT: parseInt(document.getElementById('cfg-ai-limit').value) || 10,
+    USER_SHARE_PCT: document.getElementById('cfg-share').value,
+    COMMISSION_MIN_PCT: document.getElementById('cfg-cmin').value,
+    COMMISSION_MAX_PCT: document.getElementById('cfg-cmax').value,
   };
   try {
     const res = await fetch('/api/admin/config', {
@@ -825,6 +850,10 @@ async function saveConfig() {
       _cfgDirty = false;
       toast('Đã lưu cấu hình', `Cập nhật ${data.updated.length} mục: ${data.updated.join(', ')}`);
       renderConfig();
+    } else {
+      toast('Lỗi', data.error || 'Không thể lưu cấu hình.');
+      btn.disabled = false;
+      btn.innerHTML = svg('check') + ' Lưu thay đổi';
     }
   } catch(e) {
     toast('Lỗi', 'Không thể lưu cấu hình.');
@@ -886,7 +915,7 @@ async function renderShopee() {
         <div>1️⃣ <b>Upload cookies</b> — Export cookies từ browser (affiliate.shopee.vn) → paste/upload</div>
         <div>2️⃣ <b>Auto Sync</b> — Mỗi 6 giờ, bot tự vào dashboard scrape báo cáo chuyển đổi</div>
         <div>3️⃣ <b>Match sub_id</b> — Mỗi link affiliate có sub_id = Zalo ID → biết user nào mua</div>
-        <div>4️⃣ <b>Cập nhật ví</b> — Đơn hoàn tất → tính 30% hoa hồng → cộng ví user → thông báo Zalo</div>
+        <div>4️⃣ <b>Cập nhật ví</b> — Đơn hoàn tất → tính phần user (% trong Cấu hình) → cộng ví user → thông báo Zalo</div>
       </div>
     </div>
     <div id="shopee-result"></div>`;
@@ -1012,6 +1041,17 @@ async function renderConfig() {
           <div class="sc">${cfgInput('cfg-webhook', location.origin+'/webhook', {readonly:true, mono:true})}<div class="help">Dùng ngrok/cloudflared tunnel để expose ra HTTPS</div></div></div>
       </div>
       <div class="card scard">
+        <div class="card-h"><div class="title-m">${svg('zap')} Hoa hồng & Nhận tiền</div></div>
+        <div class="srow"><div><div class="sl">% user nhận</div><div class="sd">Phần hoa hồng Shopee chia cho user, admin giữ phần còn lại. Áp dụng cho đồng bộ tự động.</div></div>
+          <div class="sc">${cfgInput('cfg-share', cfg.user_share_pct ?? 30, {type:'number'})}<div class="help">VD: 30 = user 30% / admin 70%</div></div></div>
+        <div class="srow"><div><div class="sl">Hoa hồng Shopee thấp nhất (%)</div><div class="sd">Dùng để tạm tính lệnh 6 và tin trả link cho user.</div></div>
+          <div class="sc">${cfgInput('cfg-cmin', cfg.commission_min_pct ?? 5, {type:'number'})}<div class="help">Mức hoa hồng phổ biến Shopee trả cho bạn</div></div></div>
+        <div class="srow"><div><div class="sl">Hoa hồng Shopee cao nhất (%)</div><div class="sd">Lớn hơn mức thấp nhất → user thấy một khoảng tiền. Bằng nhau → thấy 1 con số.</div></div>
+          <div class="sc">${cfgInput('cfg-cmax', cfg.commission_max_pct ?? 10, {type:'number'})}<div class="help">User chỉ thấy số tiền, không thấy %</div></div></div>
+        <div class="srow"><div><div class="sl">Xem trước</div><div class="sd">Tin bot gửi cho user.</div></div>
+          <div class="sc"><div id="cfg-rate-preview" style="padding:10px 14px;background:var(--surface-c);border-radius:10px;font-size:14px;line-height:1.6"></div></div></div>
+      </div>
+      <div class="card scard">
         <div class="card-h"><div class="title-m">${svg('sparkles')} AI Chatbot (Gemini)</div>${cfg.gemini_api_key_set?'<span class="badge ok">'+svg('check')+' Đã cấu hình</span>':'<span class="badge">Chưa set</span>'}</div>
         <div class="srow"><div><div class="sl">API Key</div><div class="sd">Google Gemini Flash — AI trả lời thông minh khi user chat tự do.</div></div>
           <div class="sc">
@@ -1033,7 +1073,8 @@ async function renderConfig() {
           <div class="sc">${cfgInput('cfg-db', 'data/bot.db', {readonly:true, mono:true})}</div></div>
       </div>
     </div>
-    <p class="muted" style="font-size:13px">Thay đổi sẽ cập nhật runtime ngay lập tức và ghi vào file .env.</p>`;
+    <p class="muted" style="font-size:13px">Thay đổi áp dụng cho bot trong vòng 1 phút.</p>`;
+  _cfgPreview();
 }
 
 async function testGemini() {

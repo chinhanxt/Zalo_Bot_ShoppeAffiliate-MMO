@@ -9,6 +9,7 @@ import json
 import os
 import hashlib
 import secrets
+import time
 
 from contextlib import asynccontextmanager
 
@@ -27,7 +28,7 @@ from db import (
     log_notification, notifications_list,
     scheduled_list, scheduled_create, scheduled_toggle, scheduled_delete,
     scheduled_due, scheduled_mark_sent, all_user_chat_ids,
-    kv_get, kv_set,
+    kv_get, kv_set, kv_get_prefix,
 )
 from linkgen import extract_shopee_urls, build_affiliate_link, clean_shopee_url
 from url_resolver import is_short_url, resolve_redirect
@@ -55,23 +56,50 @@ def _hash_pw(pw: str) -> str:
     return hashlib.sha256(pw.encode()).hexdigest()
 
 
+_cfg_loaded_at = 0.0
+STR_CFG_KEYS = ["AFFILIATE_ID", "ZALO_BOT_TOKEN", "ZALO_WEBHOOK_SECRET", "GEMINI_API_KEY"]
+RATE_CFG_KEYS = ["USER_SHARE_PCT", "COMMISSION_MIN_PCT", "COMMISSION_MAX_PCT"]
+
+
 async def _ensure_db():
-    global _db_initialized
+    global _db_initialized, _cfg_loaded_at
     if not _db_initialized:
         await init_db()
-        await _load_config_overrides()
+        saved_sessions = await kv_get("admin_sessions")
+        if saved_sessions:
+            for sid in json.loads(saved_sessions):
+                _active_sessions[sid] = True
         _db_initialized = True
+    if time.time() - _cfg_loaded_at > 60:
+        await _load_config_overrides()
+        _cfg_loaded_at = time.time()
 
 
 async def _load_config_overrides():
-    for key in ["AFFILIATE_ID", "ZALO_BOT_TOKEN", "ZALO_WEBHOOK_SECRET", "GEMINI_API_KEY"]:
-        val = await kv_get(f"config_{key}")
-        if val is not None and val != "":
+    kv = await kv_get_prefix("config_")
+    for key in STR_CFG_KEYS:
+        val = kv.get(f"config_{key}")
+        if val:
             setattr(config, key, val)
-    saved_sessions = await kv_get("admin_sessions")
-    if saved_sessions:
-        for sid in json.loads(saved_sessions):
-            _active_sessions[sid] = True
+    for key in RATE_CFG_KEYS:
+        val = kv.get(f"config_{key}")
+        if val:
+            try:
+                setattr(config, key, float(val))
+            except ValueError:
+                pass
+
+
+def _est_range(amount: float) -> tuple[int, int]:
+    share = config.USER_SHARE_PCT / 100
+    lo = int(round(amount * config.COMMISSION_MIN_PCT / 100 * share / 100) * 100)
+    hi = int(round(amount * config.COMMISSION_MAX_PCT / 100 * share / 100) * 100)
+    return lo, max(lo, hi)
+
+
+def _fmt_est(amount: float) -> str:
+    lo, hi = _est_range(amount)
+    return fmt_vnd(lo) if hi <= lo else f"{fmt_vnd(lo)} – {fmt_vnd(hi)}"
 
 
 def _is_authed(request: Request) -> bool:
@@ -375,7 +403,6 @@ def _parse_vnd(text: str) -> float | None:
     return None
 
 
-CASHBACK_RATE = 0.015
 
 
 async def handle_user_message(result: dict):
@@ -428,8 +455,8 @@ async def handle_user_message(result: dict):
             f"━━━━━━━━━━━━━━━\n"
             f"🛒 Cách nhận tiền:\n"
             f"Gửi link Shopee → mua qua link nhận tiền → đơn thành công → Shopee xác nhận (~7-30 ngày) → tiền vào ví → rút về ngân hàng!\n\n"
-            f"💰 Nhận ~1.5% giá trị đơn\n"
-            f"📋 VD: đơn 200.000đ → nhận ~3.000đ"
+            f"💰 VD: đơn 200.000đ → nhận khoảng {_fmt_est(200000)}\n"
+            f"Gõ \"6 [giá đơn]\" để tính chính xác hơn 🧮"
         )
         return
 
@@ -437,14 +464,13 @@ async def handle_user_message(result: dict):
     if tinh_match:
         amount = _parse_vnd(tinh_match.group(1))
         if amount and amount >= 1000:
-            cashback = round(amount * CASHBACK_RATE)
             await send_text(
                 config.ZALO_BOT_TOKEN, chat_id,
                 f"🧮 Ước tính nhận tiền\n"
                 f"━━━━━━━━━━━━━━━\n"
                 f"🛒 Giá đơn: {_fmt_vnd(amount)}\n"
-                f"💰 Nhận ~{_fmt_vnd(cashback)}\n\n"
-                f"📌 Đây là ước tính (~1.5%), thực tế tuỳ ngành hàng có thể cao hơn!\n"
+                f"💰 Nhận khoảng: {_fmt_est(amount)}\n\n"
+                f"📌 Số tiền tạm tính, mức thật tuỳ ngành hàng & shop. Đơn thành công → tiền tự vào ví!\n"
                 f"Gửi link Shopee để nhận link nhận tiền nha 🛒"
             )
         else:
@@ -462,9 +488,9 @@ async def handle_user_message(result: dict):
             f"━━━━━━━━━━━━━━━\n"
             f"Nhập giá đơn hàng để tính:\n\n"
             f"VD:\n"
-            f"• 6 200k → nhận ~{_fmt_vnd(round(200000 * CASHBACK_RATE))}\n"
-            f"• 6 1tr5 → nhận ~{_fmt_vnd(round(1500000 * CASHBACK_RATE))}\n"
-            f"• 6 500.000 → nhận ~{_fmt_vnd(round(500000 * CASHBACK_RATE))}\n\n"
+            f"• 6 200k → nhận khoảng {_fmt_est(200000)}\n"
+            f"• 6 1tr5 → nhận khoảng {_fmt_est(1500000)}\n"
+            f"• 6 500.000 → nhận khoảng {_fmt_est(500000)}\n\n"
             f"💡 Gõ: 6 [giá đơn]"
         )
         return
@@ -473,14 +499,13 @@ async def handle_user_message(result: dict):
     looks_like_account = digits_only.isdigit() and digits_only.startswith("0") and len(digits_only) >= 9
     bare_amount = None if looks_like_account else _parse_vnd(text)
     if bare_amount and 1000 <= bare_amount <= 1_000_000_000:
-        cashback = round(bare_amount * CASHBACK_RATE)
         await send_text(
             config.ZALO_BOT_TOKEN, chat_id,
             f"🧮 Ước tính nhận tiền\n"
             f"━━━━━━━━━━━━━━━\n"
             f"🛒 Giá đơn: {_fmt_vnd(bare_amount)}\n"
-            f"💰 Nhận ~{_fmt_vnd(cashback)}\n\n"
-            f"📌 Đây là ước tính (~1.5%), thực tế tuỳ ngành hàng có thể cao hơn!\n"
+            f"💰 Nhận khoảng: {_fmt_est(bare_amount)}\n\n"
+            f"📌 Số tiền tạm tính, mức thật tuỳ ngành hàng & shop. Đơn thành công → tiền tự vào ví!\n"
             f"Gửi link Shopee để nhận link nhận tiền nha 🛒"
         )
         return
@@ -727,7 +752,7 @@ async def handle_user_message(result: dict):
         reply = (
             f"🎉 Link nhận tiền của bạn:\n\n"
             f"🔗 {results[0]}\n\n"
-            f"💲 Nhận ~1.5% giá trị đơn\n"
+            f"💰 VD: đơn 200.000đ → nhận khoảng {_fmt_est(200000)}\n"
             f"📌 Mua qua link → đơn thành công → tiền tự vào ví!\n\n"
             f"💡 Gõ \"6 [giá đơn]\" để tính nhận tiền\n"
             f"VD: 6 200k · 6 1tr5 · 6 500.000"
@@ -737,7 +762,7 @@ async def handle_user_message(result: dict):
         for i, lk in enumerate(results, 1):
             reply += f"{i}. {lk}\n"
         reply += (
-            f"\n💰 Nhận ~1.5%/đơn · Đơn thành công → tiền vào ví!\n\n"
+            f"\n💰 VD: đơn 200.000đ → nhận khoảng {_fmt_est(200000)} · Đơn thành công → tiền vào ví!\n\n"
             f"💡 Gõ \"6 [giá đơn]\" để tính nhận tiền"
         )
 
@@ -886,6 +911,9 @@ async def api_admin_config():
         "gemini_api_key": gemini,
         "gemini_api_key_set": bool(gemini),
         "ai_user_limit": int(await kv_get("config_AI_USER_LIMIT") or "10"),
+        "user_share_pct": config.USER_SHARE_PCT,
+        "commission_min_pct": config.COMMISSION_MIN_PCT,
+        "commission_max_pct": config.COMMISSION_MAX_PCT,
         "host": config.HOST,
         "port": config.PORT,
     }
@@ -898,6 +926,26 @@ ENV_KEYS = {"AFFILIATE_ID", "ZALO_BOT_TOKEN", "ZALO_WEBHOOK_SECRET", "GEMINI_API
 async def api_admin_config_update(request: Request):
     body = await request.json()
     updated = []
+    rates = {}
+    for key in RATE_CFG_KEYS:
+        if key in body and str(body[key]).strip() != "":
+            try:
+                rates[key] = float(body[key])
+            except (TypeError, ValueError):
+                return {"ok": False, "error": f"{key} phải là số"}
+    share = rates.get("USER_SHARE_PCT", config.USER_SHARE_PCT)
+    cmin = rates.get("COMMISSION_MIN_PCT", config.COMMISSION_MIN_PCT)
+    cmax = rates.get("COMMISSION_MAX_PCT", config.COMMISSION_MAX_PCT)
+    if not (0 < share <= 100):
+        return {"ok": False, "error": "% user nhận phải trong khoảng 1–100"}
+    if not (0 < cmin <= 100 and 0 < cmax <= 100):
+        return {"ok": False, "error": "% hoa hồng Shopee phải trong khoảng 0–100"}
+    if cmax < cmin:
+        return {"ok": False, "error": "Hoa hồng cao nhất phải ≥ thấp nhất"}
+    for key, val in rates.items():
+        setattr(config, key, val)
+        await kv_set(f"config_{key}", str(val))
+        updated.append(key)
     for key in ENV_KEYS:
         if key in body:
             val = str(body[key]).strip()

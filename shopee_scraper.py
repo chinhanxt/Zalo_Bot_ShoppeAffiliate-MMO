@@ -300,7 +300,7 @@ async def sync_commissions_to_wallets(conversions: list[dict]) -> dict:
         if status in ("CANCELLED", "FRAUD", "CANCELED"):
             continue
 
-        user_commission = round(commission * 0.3, 0)
+        user_commission = round(commission * config.USER_SHARE_PCT / 100, 0)
         if user_commission <= 0:
             continue
 
